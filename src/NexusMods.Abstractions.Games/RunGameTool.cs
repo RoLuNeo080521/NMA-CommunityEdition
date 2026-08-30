@@ -61,29 +61,45 @@ public class RunGameTool<T> : IRunGameTool
         var program = await GetGamePath(loadout);
         var primaryFile = loadout.InstallationInstance.Locations.ToAbsolutePath(_game.GetPrimaryFile(loadout.InstallationInstance));
 
-        if (OSInformation.Shared.IsLinux && program.Equals(primaryFile))
+        // On Linux, Windows .exe files can't be exec'd directly by the OS —
+        // they need a Wine/Proton runner supplied by Steam or Heroic. Route to
+        // the launcher regardless of whether `program` is the primary game file
+        // or a modded loader (e.g. f4se_loader.exe, skse64_loader.exe). Users
+        // launching a script extender on Steam Linux must configure it in Steam
+        // Launch Options — Steam will then apply that when the launcher URL is
+        // invoked. On Windows we keep the previous behaviour and exec the
+        // loader directly since .exe files are native.
+        if (OSInformation.Shared.IsLinux)
         {
             var locatorResult = loadout.InstallationInstance.LocatorResult;
             if (locatorResult.Store == GameStore.Steam)
             {
-                await RunThroughSteam(locatorResult.StoreIdentifier, cancellationToken, commandLineArgs);
+                if (!program.Equals(primaryFile))
+                    _logger.LogInformation("Delegating launch to Steam (Linux). Configure `{Program}` in Steam Launch Options if needed.", program.FileName);
+                await RunThroughSteam(locatorResult.StoreIdentifier, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
                 return;
             }
 
             if (locatorResult.Store == GameStore.GOG)
             {
-                await RunThroughHeroic("gog", locatorResult.StoreIdentifier, cancellationToken, commandLineArgs);
+                if (!program.Equals(primaryFile))
+                    _logger.LogInformation("Delegating launch to Heroic (Linux). Configure `{Program}` in Heroic launch options if needed.", program.FileName);
+                await RunThroughHeroic("gog", locatorResult.StoreIdentifier, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
+                return;
+            }
+
+            if (locatorResult.Store == GameStore.EGS)
+            {
+                // Heroic's Epic runner is "legendary"
+                // (https://heroicgameslauncher.com/docs/integrations/legendary).
+                if (!program.Equals(primaryFile))
+                    _logger.LogInformation("Delegating launch to Heroic (Linux). Configure `{Program}` in Heroic launch options if needed.", program.FileName);
+                await RunThroughHeroic("legendary", locatorResult.StoreIdentifier, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
                 return;
             }
         }
 
-        var names = new HashSet<string>
-        {
-            program.FileName,
-            program.GetFileNameWithoutExtension(),
-            primaryFile.FileName,
-            primaryFile.GetFileNameWithoutExtension(),
-        };
+        var names = BuildProcessNameSet(program, primaryFile);
 
         // In the case of a preloader, we need to wait for the actual game file to exit
         // before we completely exit this routine. So get a list of all the processes with a give
@@ -169,15 +185,13 @@ public class RunGameTool<T> : IRunGameTool
         return process;
     }
 
-    private async Task RunThroughSteam(string appId, CancellationToken cancellationToken, string[] commandLineArgs)
+    private async Task RunThroughSteam(string appId, CancellationToken cancellationToken, string[] commandLineArgs, HashSet<string> processNames)
     {
         if (!OSInformation.Shared.IsLinux) OSInformation.Shared.ThrowUnsupported();
 
         var timeout = TimeSpan.FromMinutes(5);
 
-        // NOTE(erri120): This should be empty for most of the time. We want to wait until the reaper process for
-        // the current starts, so we ignore every reaper process that already exists.
-        var existingReaperProcesses = Process.GetProcessesByName("reaper").Select(x => x.Id).ToHashSet();
+        var existingGameProcesses = FindMatchingProcesses(processNames).Select(x => x.Id).ToHashSet();
 
         // Build the Steam URL with optional command line arguments
         // https://developer.valvesoftware.com/wiki/Steam_browser_protocol
@@ -195,15 +209,70 @@ public class RunGameTool<T> : IRunGameTool
         var steam = await WaitForProcessToStart("steam", timeout, existingProcesses: null, cancellationToken);
         if (steam is null) return;
 
-        // NOTE(erri120): Reaper is a custom tool for cleaning up child processes
-        // See https://github.com/sonic2kk/steamtinkerlaunch/wiki/Steam-Reaper for details.
-        var reaper = await WaitForProcessToStart("reaper", timeout, existingReaperProcesses, cancellationToken);
-        if (reaper is null) return;
+        // Wait for the actual game process to appear. Steam spawns transient
+        // wrappers (`reaper`, `srt-bwrap`, `pv-adverb`, `python3` for Proton…)
+        // that only live a few seconds before re-exec'ing into the real game
+        // binary — tracking reaper directly makes NMA think the game exited
+        // right after launch. Wait on the game exe name instead, which stays
+        // for the whole session.
+        var gameProcess = await WaitForFirstMatchingProcessAsTask(processNames, timeout, existingGameProcesses, cancellationToken);
+        if (gameProcess is null)
+        {
+            _logger.LogWarning("Game process matching `{Names}` did not appear within `{Timeout:g}` after launching Steam app `{AppId}`.",
+                string.Join(",", processNames), timeout, appId);
+            return;
+        }
 
-        await reaper.WaitForExitAsync(cancellationToken);
+        _logger.LogInformation("Steam launched `{ProcessName}` (pid {Pid}); waiting for exit", gameProcess.ProcessName, gameProcess.Id);
+        // Bethesda titles cascade through several short-lived helpers before
+        // settling on the real game process (Fallout4Launcher.exe → f4se_loader
+        // → Fallout4.exe, or similar). Polling one pid would end the session
+        // as soon as the first helper exits. Instead track the set of game-
+        // named processes and consider the game running while any of them is
+        // alive — with a grace period so the launcher→game transition doesn't
+        // read as "exited".
+        await PollUntilNoMatchingProcessAsync(processNames, existingGameProcesses, cancellationToken);
     }
 
-    private async Task RunThroughHeroic(string type, string productId, CancellationToken cancellationToken, string[] commandLineArgs)
+    private static async Task PollUntilNoMatchingProcessAsync(HashSet<string> processNames, HashSet<int> existingProcesses, CancellationToken cancellationToken)
+    {
+        // 15 seconds of empty polls before we conclude the game is really gone.
+        // Enough to bridge Fallout4Launcher.exe → Fallout4.exe on slower disks
+        // without falsely detecting exit.
+        var graceThreshold = TimeSpan.FromSeconds(15);
+        var pollInterval = TimeSpan.FromSeconds(2);
+        DateTime? firstEmptyAt = null;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var anyAlive = FindMatchingProcesses(processNames).Any(p => !existingProcesses.Contains(p.Id));
+            if (anyAlive)
+            {
+                firstEmptyAt = null;
+            }
+            else
+            {
+                firstEmptyAt ??= DateTime.UtcNow;
+                if (DateTime.UtcNow - firstEmptyAt.Value >= graceThreshold) return;
+            }
+            try { await Task.Delay(pollInterval, cancellationToken); }
+            catch (OperationCanceledException) { return; }
+        }
+    }
+
+    private async Task<Process?> WaitForFirstMatchingProcessAsTask(HashSet<string> processNames, TimeSpan timeout, HashSet<int> existingProcesses, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline && !cancellationToken.IsCancellationRequested)
+        {
+            var candidate = FindMatchingProcesses(processNames).FirstOrDefault(p => !existingProcesses.Contains(p.Id));
+            if (candidate is not null) return candidate;
+            try { await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken); }
+            catch (OperationCanceledException) { return null; }
+        }
+        return null;
+    }
+
+    private async Task RunThroughHeroic(string type, string productId, CancellationToken cancellationToken, string[] commandLineArgs, HashSet<string> processNames)
     {
         Debug.Assert(OSInformation.Shared.IsLinux);
 
@@ -217,8 +286,59 @@ public class RunGameTool<T> : IRunGameTool
             heroicUrl += $"&{encodedArgs}";
         }
 
-        // TODO: track process
+        // Snapshot processes already matching the game name BEFORE launching,
+        // so re-launches or stale wine processes don't get mistaken for the
+        // new game instance.
+        var existingProcessIds = FindMatchingProcesses(processNames).Select(p => p.Id).ToHashSet();
+
         _osInterop.OpenUri(new Uri(heroicUrl));
+
+        // Heroic launches the game asynchronously via Proton/Wine. The job
+        // must stay alive while the game runs so GameRunningTracker keeps the
+        // launch button in its "running" state and the UI knows the session
+        // is ongoing.
+        var startupTimeout = TimeSpan.FromMinutes(3);
+        var startupDeadline = DateTime.UtcNow + startupTimeout;
+        Process? gameProcess = null;
+        while (DateTime.UtcNow < startupDeadline && !cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            gameProcess = FindMatchingProcesses(processNames)
+                .FirstOrDefault(p => !existingProcessIds.Contains(p.Id));
+            if (gameProcess is not null) break;
+        }
+
+        if (gameProcess is null)
+        {
+            _logger.LogWarning("Game process matching `{Names}` did not start within `{Timeout:g}` after Heroic launch for `{ProductId}`",
+                string.Join(",", processNames), startupTimeout, productId);
+            return;
+        }
+
+        _logger.LogInformation("Heroic launched `{ProcessName}` (pid {Pid}); waiting for exit", gameProcess.ProcessName, gameProcess.Id);
+        // Same rationale as Steam: track the game name set to survive launcher
+        // → game process transitions instead of pinning a single pid.
+        await PollUntilNoMatchingProcessAsync(processNames, existingProcessIds, cancellationToken);
+    }
+
+    private static HashSet<string> BuildProcessNameSet(AbsolutePath program, AbsolutePath primaryFile)
+    {
+        var names = new HashSet<string>
+        {
+            program.FileName,
+            program.GetFileNameWithoutExtension(),
+            primaryFile.FileName,
+            primaryFile.GetFileNameWithoutExtension(),
+        };
+
+        // Linux truncates kernel-reported process names to 15 chars (TASK_COMM_LEN),
+        // which is what .NET's Process.ProcessName returns. Add truncated variants
+        // so wine-launched executables like "Cyberpunk2077.exe" still match as
+        // "Cyberpunk2077.e".
+        foreach (var name in names.ToArray())
+            if (name.Length > 15) names.Add(name[..15]);
+
+        return names;
     }
 
     private async ValueTask<Process?> WaitForProcessToStart(
