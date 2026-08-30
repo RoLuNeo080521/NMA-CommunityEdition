@@ -107,8 +107,13 @@ public class Fallout4 : ICreationEngineGame, IGameData<Fallout4>
         var fileName = name?.FileName.ToString() ?? "unknown.esm";
         var key = ModKey.FromFileName(fileName);
         await using var stream = await _streamSource.OpenAsync(hash);
-        var meta = ParsingMeta.Factory(BinaryReadParameters.Default, GameRelease.Fallout4, key, stream!);
-        await using var mutagenStream = new MutagenBinaryReadStream(stream!, meta);
+        // Vanilla plugins may not be backed up yet on a fresh loadout, so the
+        // stream source returns null. Return null instead of NRE-crashing in
+        // Mutagen; MissingMasterEmitter treats a null result as "unknown mod"
+        // and skips the diagnostic gracefully.
+        if (stream is null) return null;
+        var meta = ParsingMeta.Factory(BinaryReadParameters.Default, GameRelease.Fallout4, key, stream);
+        await using var mutagenStream = new MutagenBinaryReadStream(stream, meta);
         using var frame = new MutagenFrame(mutagenStream);
         return Fallout4Mod.CreateFromBinary(frame, Fallout4Release.Fallout4, EmptyGroupMask);
     }

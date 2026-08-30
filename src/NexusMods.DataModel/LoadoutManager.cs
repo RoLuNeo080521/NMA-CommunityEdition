@@ -22,6 +22,8 @@ using NexusMods.MnemonicDB.Abstractions.ElementComparers;
 using NexusMods.MnemonicDB.Abstractions.Internals;
 using NexusMods.MnemonicDB.Abstractions.TxFunctions;
 using NexusMods.MnemonicDB.Abstractions.ValueSerializers;
+using NexusMods.Paths;
+using NexusMods.Sdk;
 using NexusMods.Sdk.Games;
 using NexusMods.Sdk.Jobs;
 using NexusMods.Sdk.Library;
@@ -98,7 +100,22 @@ internal partial class LoadoutManager : ILoadoutManager
             }
 
             if (!_fileHashesService.TryGetVanityVersion((installation.LocatorResult.Store, locatorIds.ToArray()), out var version))
-                _logger.LogWarning("Unable to find game version for {Game}", installation.Game.DisplayName);
+            {
+                // Fallback: read the primary executable's PE version resource
+                // (e.g. "1.10.163.0") so the UI still shows something useful when
+                // the upstream hashes DB has no matching version definition —
+                // helps users find compatible mods on Nexus without guessing.
+                var fileVersion = TryReadPrimaryFileVersion(installation);
+                if (fileVersion.HasValue)
+                {
+                    version = fileVersion.Value;
+                    _logger.LogInformation("No DB version for {Game}; using file version `{Version}`", installation.Game.DisplayName, version);
+                }
+                else
+                {
+                    _logger.LogWarning("Unable to find game version for {Game}", installation.Game.DisplayName);
+                }
+            }
 
             var loadout = new Loadout.New(tx)
             {
@@ -636,5 +653,21 @@ internal partial class LoadoutManager : ILoadoutManager
             .First();
 
         return ResolveFileConflicts(winnerIds: winnerIds, loserId: loser.LoadoutItemGroupPriorityId);
+    }
+
+    private static VanityVersion? TryReadPrimaryFileVersion(GameInstallation installation)
+    {
+        try
+        {
+            var primary = installation.Locations.ToAbsolutePath(installation.Game.GetPrimaryFile(installation));
+            if (!primary.FileExists) return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(primary.ToNativeSeparators(OSInformation.Shared));
+            var raw = info.ProductVersion ?? info.FileVersion;
+            return string.IsNullOrWhiteSpace(raw) ? null : VanityVersion.From(raw.Trim());
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

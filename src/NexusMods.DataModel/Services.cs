@@ -47,6 +47,12 @@ public static class Services
         coll.AddSingleton<ATableFunction, IntrinsicFiles>();
         coll.AddSingleton<AScalarFunction, FNV1aHashScalar>();
         coll.AddValueAdaptor<ushort, LocationId>(LocationId.From);
+        // MnemonicDB stores LocationId as a ushort but DuckDB surfaces it as
+        // UBigInt when accessed as a struct field (e.g. Path.Item2 in the
+        // DiskStateEntry composite). Without this adaptor the diagnostic
+        // emitter that resolves game files (used by ParsePlugin for masters)
+        // throws on any Bethesda game with vanilla plugins on disk.
+        coll.AddValueAdaptor<ulong, LocationId>(v => LocationId.From(checked((ushort)v)));
 
         // Settings
         coll.AddSettings<DataModelSettings>();

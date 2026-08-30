@@ -579,8 +579,21 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         }
         else
         {
-            tx.Add(loadout, Loadout.GameVersion, VanityVersion.DefaultValue);
-            Logger.LogWarning("Found no vanity version for locator IDs `{LocatorIds}` (`{Store}`)", newLocatorIds, gameLocatorResult.Store);
+            // Fallback: read the PE version resource from the primary game
+            // executable so the loadout stays informative for the user even
+            // when the upstream hashes DB has no version definition covering
+            // this install (e.g. F4 post-Next-Gen manifests).
+            var fileVersion = TryReadPrimaryFileVersion(loadout.InstallationInstance);
+            if (fileVersion.HasValue)
+            {
+                tx.Add(loadout, Loadout.GameVersion, fileVersion.Value);
+                Logger.LogInformation("No DB vanity version for locator IDs `{LocatorIds}` (`{Store}`); using file version `{Version}`", newLocatorIds, gameLocatorResult.Store, fileVersion.Value);
+            }
+            else
+            {
+                tx.Add(loadout, Loadout.GameVersion, VanityVersion.DefaultValue);
+                Logger.LogWarning("Found no vanity version for locator IDs `{LocatorIds}` (`{Store}`)", newLocatorIds, gameLocatorResult.Store);
+            }
         }
 
         foreach (var id in locatorsToRemove)
@@ -1455,6 +1468,22 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
 
         // Run the groupings
         await RunActions(desiredState, installation);
+    }
+
+    private static VanityVersion? TryReadPrimaryFileVersion(GameInstallation installation)
+    {
+        try
+        {
+            var primary = installation.Locations.ToAbsolutePath(installation.Game.GetPrimaryFile(installation));
+            if (!primary.FileExists) return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(primary.ToNativeSeparators(OSInformation.Shared));
+            var raw = info.ProductVersion ?? info.FileVersion;
+            return string.IsNullOrWhiteSpace(raw) ? null : VanityVersion.From(raw.Trim());
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
 

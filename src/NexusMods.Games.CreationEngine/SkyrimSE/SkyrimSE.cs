@@ -103,8 +103,11 @@ public class SkyrimSE : ICreationEngineGame, IGameData<SkyrimSE>
         var fileName = name?.FileName.ToString() ?? "unknown.esm";
         var key = ModKey.FromFileName(fileName);
         await using var stream = await _streamSource.OpenAsync(hash);
-        var meta = ParsingMeta.Factory(BinaryReadParameters.Default, GameRelease.SkyrimSE, key, stream!);
-        await using var mutagenStream = new MutagenBinaryReadStream(stream!, meta);
+        // Vanilla plugins may not be backed up yet on a fresh loadout; return
+        // null instead of NRE-crashing in Mutagen. Symmetric with Fallout4.
+        if (stream is null) return null;
+        var meta = ParsingMeta.Factory(BinaryReadParameters.Default, GameRelease.SkyrimSE, key, stream);
+        await using var mutagenStream = new MutagenBinaryReadStream(stream, meta);
         using var frame = new MutagenFrame(mutagenStream);
         return SkyrimMod.CreateFromBinary(frame, SkyrimRelease.SkyrimSE, EmptyGroupMask);
     }

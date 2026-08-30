@@ -37,11 +37,17 @@ public class PluginsFile : IIntrinsicFile
     
     public async Task Write(Stream stream, Loadout.ReadOnly loadout, Dictionary<GamePath, SyncNode> syncTree)
     {
+        // MakeMetadata returns null when the plugin can't be parsed (usually
+        // because the vanilla file isn't backed up yet on a fresh loadout).
+        // We drop those entries instead of NRE-ing; they'll be picked up on
+        // the next sync once the file store has the archive.
         var plugins = await syncTree
             .Where(p => p.Key.Parent == KnownPaths.Data && KnownCEExtensions.PluginFiles.Contains(p.Key.Extension))
             .Where(p => p.Value.HaveLoadout)
             .ToAsyncEnumerable()
             .SelectAwait(MakeMetadata)
+            .Where(m => m.HasValue)
+            .Select(m => m!.Value)
             .ToDictionaryAsync(x => x.ModKey);
 
         if (plugins.Count == 0)
@@ -111,7 +117,7 @@ public class PluginsFile : IIntrinsicFile
         return metadata.ModKey;
     }
 
-    private async ValueTask<Metadata> MakeMetadata(KeyValuePair<GamePath, SyncNode> arg)
+    private async ValueTask<Metadata?> MakeMetadata(KeyValuePair<GamePath, SyncNode> arg)
     {
         var relPath = arg.Key.Path.FileName;
         Hash hash;
@@ -124,7 +130,8 @@ public class PluginsFile : IIntrinsicFile
             hash = syncNode.Disk.Hash;
         
         var modHeader = await _game.ParsePlugin(hash, relPath);
-        return new Metadata(relPath, modHeader!.ModKey, hash, modHeader);
+        if (modHeader is null) return null;
+        return new Metadata(relPath, modHeader.ModKey, hash, modHeader);
     }
     
 

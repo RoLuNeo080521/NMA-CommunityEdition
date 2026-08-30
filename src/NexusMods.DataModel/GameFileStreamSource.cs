@@ -39,13 +39,26 @@ public class GameFileStreamSource : IReadOnlyStreamSource
 
     public AbsolutePath? Resolve(Hash hash)
     {
+        // Note: DiskStateEntry.Path is a composite (GameInstall, LocationId, RelativePath).
+        // Path.Item1 is redundant with the Game column here, so we only extract
+        // Item2 (LocationId) and Item3 (RelativePath) to keep the SELECT column
+        // count aligned with the tuple type. Previous version selected Path.Item1
+        // too, which shifted every subsequent field by one position and made the
+        // query throw as soon as any Bethesda game triggered MissingMasterEmitter.
         var options = _conn.Query<(EntityId Game, LocationId Location, RelativePath Path, DateTimeOffset LastModified, Hash Hash, Size Size)>(
-            $"select Game, Path.Item1, Path.Item2, Path.Item3, LastModified, Hash, Size from mdb_DiskStateEntry(Db=>{_conn}) WHERE Hash = {hash} ORDER BY LastModified DESC");
+            $"select Game, Path.Item2, Path.Item3, LastModified, Hash, Size from mdb_DiskStateEntry(Db=>{_conn}) WHERE Hash = {hash} ORDER BY LastModified DESC");
         foreach (var option in options)
         {
             var metadata = GameInstallMetadata.Load(_conn.Db, option.Game);
             if (!metadata.IsValid()) continue;
-            if (!_gameRegistry.TryGetGameInstallation(metadata.LastSyncedLoadout, out var installation)) continue;
+            // First sync of a game has no LastSyncedLoadout yet; the attribute
+            // getter throws on access, so probe via TryGetValue and skip cleanly.
+            // Without this, MissingMasterEmitter crashes at loadout creation for
+            // any game whose diagnostics resolve files via GameFileStreamSource.
+            if (!GameInstallMetadata.LastSyncedLoadout.TryGetValue(metadata, out var lastSyncedLoadoutId)) continue;
+            var lastSyncedLoadout = Sdk.Loadouts.Loadout.Load(_conn.Db, lastSyncedLoadoutId);
+            if (!lastSyncedLoadout.IsValid()) continue;
+            if (!_gameRegistry.TryGetGameInstallation(lastSyncedLoadout, out var installation)) continue;
 
             var resolvedPath = installation.Locations.ToAbsolutePath(new GamePath(option.Location, option.Path));
             if (!resolvedPath.FileExists) continue;
