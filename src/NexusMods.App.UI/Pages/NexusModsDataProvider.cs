@@ -247,8 +247,15 @@ public class NexusModsDataProvider : ILibraryDataProvider, ILoadoutDataProvider
         itemModel.Add(LibraryColumns.DownloadedDate.ComponentKey, new DateComponent(value: libraryItem.GetCreatedAt()));
         itemModel.Add(LibraryColumns.ItemVersion.CurrentVersionComponentKey, new VersionComponent(value: fileMetadata.Version));
 
-        if (libraryItem.FileMetadata.Size.TryGet(out var size))
-            itemModel.Add(SharedColumns.ItemSize.ComponentKey, new SizeComponent(value: size));
+        // Prefer the actual archive size on disk (always accurate) over the
+        // Nexus API metadata size, which can be missing or zero for partially
+        // indexed or manually imported mods. The parent row sums LibraryFile.Size
+        // for consistency, so the child should match.
+        var diskSize = LibraryFile.Size.GetOptional(libraryItem).ValueOr(() => Size.Zero);
+        var metaSize = libraryItem.FileMetadata.Size.ValueOr(() => Size.Zero);
+        var resolvedSize = diskSize > Size.Zero ? diskSize : metaSize;
+        if (resolvedSize > Size.Zero)
+            itemModel.Add(SharedColumns.ItemSize.ComponentKey, new SizeComponent(value: resolvedSize));
 
         LibraryDataProviderHelper.AddInstalledDateComponent(itemModel, linkedLoadoutItemsObservable);
         LibraryDataProviderHelper.AddInstallActionComponent(itemModel, linkedLoadoutItemsObservable);
