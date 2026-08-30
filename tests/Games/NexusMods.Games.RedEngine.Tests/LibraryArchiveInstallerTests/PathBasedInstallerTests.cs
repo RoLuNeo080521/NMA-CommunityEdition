@@ -29,6 +29,17 @@ public class PathBasedInstallerTests(ITestOutputHelper outputHelper) : ALibraryA
         ( "Files Under No Folder", typeof(SimpleOverlayModInstaller), ["bin/x64/foo.exe", "archive/pc/mod/foo.archive"] ),
         ( "Files Under Sub Folders", typeof(SimpleOverlayModInstaller), ["mymod/bin/x64/foo.exe", "mymod/archive/pc/mod/foo.archive"] ),
         ( "All Common Prefixes", typeof(SimpleOverlayModInstaller), ["bin/x64/foo.exe", "engine/foo.exe", "r6/foo.exe", "red4ext/foo.exe", "archive/pc/mod/foo.archive"] ),
+        // Regression: mods that ship deeply nested files under r6/scripts/... alongside
+        // an archive/pc/mod/... companion would previously only deploy one side because
+        // SimpleOverlayModInstaller filtered roots to the shallowest depth. Both must
+        // land on disk now.
+        ( "Multi-root Deep And Shallow", typeof(SimpleOverlayModInstaller), [
+            "r6/scripts/MyMod/Core.reds",
+            "r6/scripts/MyMod/HubMenu/Stats.reds",
+            "r6/tweaks/mymod/config.yaml",
+            "archive/pc/mod/mymod.archive",
+            "archive/pc/mod/mymod.xl",
+        ] ),
         ( "Files with no folder", typeof(FolderlessModInstaller), ["folder/filea.archive", "fileb.archive"] ),
         ( "Ignored Extensions", typeof(FolderlessModInstaller), ["folder/filea.archive", "file.txt", "docs/file.md", "bin/x64/file.pdf", "bin/x64/file.png"] ),
         ( "Appearance Preset", typeof(AppearancePresetInstaller), ["cool_choom.preset"] ),

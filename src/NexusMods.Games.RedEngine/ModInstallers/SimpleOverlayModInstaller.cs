@@ -37,26 +37,25 @@ public class SimpleOverlayModInstaller : ALibraryArchiveInstaller
         CancellationToken cancellationToken)
     {
         var tree = LibraryArchiveTreeExtensions.GetTree(libraryArchive);
-        
+
         // Note: Expected search space here is small, highest expected overhead is in FindSubPathRootsByKeyUpward.
         // Find all paths which match a known base/root directory.
         var roots = RootPaths
             .SelectMany(x => tree.FindSubPathRootsByKeyUpward(x.Parts.ToArray()))
-            .OrderBy(node => node.Depth())
             .ToArray();
 
         if (roots.Length == 0) return ValueTask.FromResult<InstallerResult>(new NotSupported(Reason: "Archive contains no valid roots"));
 
-        var highestRoot = roots.First();
-
         var newFiles = 0;
 
-        // Enumerate over all directories with the same depth as the most rooted item.
-        foreach (var node in roots.Where(root => root.Depth() == highestRoot.Depth()))
+        // Deploy every matched root, not just those at one depth. Otherwise a
+        // mod that ships both r6/ (depth 1) and archive/pc/mod/ (depth 3) only
+        // gets one side installed and the other side is silently dropped.
+        foreach (var node in roots)
         foreach (var file in node.Item.GetFiles<LibraryArchiveTree, RelativePath>())
         {
-            var fullPath = file.Item.Path; // all the way up to root
-            var relativePath = fullPath.DropFirst(node.Depth() - 1); // get relative path
+            var fullPath = file.Item.Path;
+            var relativePath = fullPath.DropFirst(node.Depth() - 1);
 
             _ = new LoadoutFile.New(tx, out var id)
             {

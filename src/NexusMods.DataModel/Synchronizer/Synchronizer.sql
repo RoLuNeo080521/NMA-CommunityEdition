@@ -34,21 +34,38 @@ FROM
   LEFT JOIN MDB_DELETEDFILE (Db => db) deleted_file ON loadout_item.Id = deleted_file.Id
   LEFT JOIN MDB_LOADOUTFILE (Db => db) loadout_file on loadout_item.Id = loadout_file.Id;
 
--- All winning leaf loadout items with a target path
+-- All winning leaf loadout items with a target path.
+-- Picks one full row per (Loadout, Path) deterministically: highest Priority
+-- wins, with Id DESC as tiebreak so the most recently inserted entry beats
+-- duplicates / orphans left by old retire bugs or mod updates that re-add the
+-- same TargetPath. Using ROW_NUMBER + WHERE rn=1 (rather than per-column
+-- arg_max with a scalar key) guarantees all columns come from the same row, so
+-- (Id, Hash, IsDeleted, ...) stay mutually consistent on ties.
 CREATE OR REPLACE MACRO synchronizer.WinningLeafLoadoutItem (db) AS TABLE
-SELECT
-  loadout_item.Loadout,
-  arg_max(loadout_item.Id, coalesce(group_priority.Priority, 0)) AS Id,
-  arg_max(loadout_item.Parent, coalesce(group_priority.Priority, 0)) AS Parent,
-  arg_max(loadout_item.TargetPath, coalesce(group_priority.Priority, 0)) AS TargetPath,
-  arg_max(loadout_item.Hash, coalesce(group_priority.Priority, 0)) AS Hash,
-  arg_max(loadout_item.Size, coalesce(group_priority.Priority, 0)) AS Size,
-  arg_max(loadout_item.IsDeleted, coalesce(group_priority.Priority, 0)) AS IsDeleted
-FROM
-  synchronizer.LeafLoadoutItems (db) loadout_item
-  LEFT JOIN MDB_LOADOUTITEMGROUPPRIORITY(DB => db) group_priority ON loadout_item.Parent = group_priority.Target
-WHERE loadout_item.IsEnabled
-GROUP BY loadout_item.Loadout, loadout_item.TargetPath.Item2, loadout_item.TargetPath.Item3;
+WITH ranked AS (
+  SELECT
+    loadout_item.Loadout,
+    loadout_item.Id,
+    loadout_item.Parent,
+    loadout_item.TargetPath,
+    loadout_item.Hash,
+    loadout_item.Size,
+    loadout_item.IsDeleted,
+    row_number() OVER (
+      PARTITION BY loadout_item.Loadout,
+                   loadout_item.TargetPath.Item2,
+                   loadout_item.TargetPath.Item3
+      ORDER BY coalesce(group_priority.Priority, 0) DESC,
+               loadout_item.Id DESC
+    ) AS rn
+  FROM
+    synchronizer.LeafLoadoutItems (db) loadout_item
+    LEFT JOIN MDB_LOADOUTITEMGROUPPRIORITY (DB => db) group_priority
+      ON loadout_item.Parent = group_priority.Target
+  WHERE loadout_item.IsEnabled)
+SELECT Loadout, Id, Parent, TargetPath, Hash, Size, IsDeleted
+FROM ranked
+WHERE rn = 1;
 
 -- All the files in the overrides group
 CREATE OR REPLACE MACRO synchronizer.OverrideFiles (db) AS TABLE
