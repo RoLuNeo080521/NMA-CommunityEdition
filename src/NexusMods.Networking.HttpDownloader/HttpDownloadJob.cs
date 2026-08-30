@@ -209,6 +209,20 @@ public record HttpDownloadJob : IJobDefinitionWithStart<HttpDownloadJob, Absolut
             _state.TotalBytesDownloaded = Size.FromLong(outputStream.Position);
         }
 
+        // Verify the download is complete: the server can return 200 with an
+        // empty/truncated body (rate-limit, expired token, mid-stream disconnect
+        // that flushed an EOF cleanly) and HttpClient won't throw. Without this
+        // guard, the file is silently saved at 0 bytes / partial, then NMA
+        // archives the bad payload and extracts garbage on install. Throwing
+        // HttpRequestException lets the resilience pipeline retry it.
+        if (_state.ContentLength.HasValue)
+        {
+            var expected = _state.ContentLength.Value;
+            var actual = _state.TotalBytesDownloaded;
+            if (actual < expected)
+                throw new HttpRequestException($"Download truncated: got {actual.Value} bytes, expected {expected.Value} from `{DownloadPageUri}`");
+        }
+
         // Ensure progress is set to 100% when download completes
         if (_state.ContentLength.HasValue)
             context.SetPercent(_state.ContentLength.Value, _state.ContentLength.Value);
