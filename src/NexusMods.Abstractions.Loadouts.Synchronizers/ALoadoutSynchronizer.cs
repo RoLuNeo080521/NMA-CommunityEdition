@@ -1005,6 +1005,15 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         // left by aborted retires or repeated installs of the same mod.
         loadout = await GcDuplicateLoadoutFiles(loadout);
 
+        // Retract stale DeletedFile markers that co-exist with an active
+        // LoadoutFile on the same LoadoutItem. This happens when the user
+        // manually removes a game folder / subtree that NMA still tracks:
+        // ActionIngestFromDisk creates DeletedFile markers, and any later
+        // re-enable of the item won't re-extract because the sync treats
+        // the marker as "user wants deleted". If a LoadoutFile still exists
+        // for that id, the user's intent is unambiguously to have the file.
+        loadout = await ClearContradictoryDeletedFileMarkers(loadout);
+
         // Update locator IDs before building the sync tree
         loadout = await UpdateLocatorIds(loadout);
         
@@ -1074,6 +1083,73 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         await tx.Commit();
 
         return loadout.Rebase();
+    }
+
+    /// <summary>
+    /// Remove DeletedFile markers whose TargetPath is claimed by an enabled
+    /// LoadoutFile in the same loadout. These contradictions arise when the
+    /// user manually removes a subtree that NMA had extracted while the mod
+    /// group was disabled: the sync ingested the disappearance as intent-to-
+    /// delete and dropped a marker in Overrides; once the mod group is
+    /// re-enabled the marker still wins because DoNothing tie-breaks against
+    /// the Deleted action. Dropping the contradicting markers restores the
+    /// mod's original intent so extraction resumes.
+    /// </summary>
+    private async Task<Loadout.ReadOnly> ClearContradictoryDeletedFileMarkers(Loadout.ReadOnly loadout)
+    {
+        // Enabled LoadoutFile TargetPaths in this loadout.
+        var claimed = new HashSet<GamePath>();
+        foreach (var lf in LoadoutFile.All(loadout.Db))
+        {
+            var itemWithPath = lf.AsLoadoutItemWithTargetPath();
+            var item = itemWithPath.AsLoadoutItem();
+            if (!item.LoadoutId.Equals(loadout.LoadoutId)) continue;
+            if (IsChainDisabled(loadout.Db, item)) continue;
+            claimed.Add(new GamePath(itemWithPath.TargetPath.Item2, itemWithPath.TargetPath.Item3));
+        }
+
+        var toDelete = new List<EntityId>();
+        foreach (var df in DeletedFile.All(loadout.Db))
+        {
+            var lfItem = LoadoutItemWithTargetPath.Load(loadout.Db, df.Id);
+            if (!lfItem.IsValid()) continue;
+            if (!lfItem.AsLoadoutItem().LoadoutId.Equals(loadout.LoadoutId)) continue;
+            if (!claimed.Contains(new GamePath(lfItem.TargetPath.Item2, lfItem.TargetPath.Item3))) continue;
+            toDelete.Add(df.Id);
+        }
+
+        if (toDelete.Count == 0) return loadout;
+
+        Logger.LogInformation("Clearing {Count} contradicting DeletedFile markers on loadout {LoadoutId}", toDelete.Count, loadout.LoadoutId);
+        using var tx = Connection.BeginTransaction();
+        foreach (var id in toDelete)
+        {
+            var df = DeletedFile.Load(loadout.Db, id);
+            // The marker is a standalone entity (LoadoutItem + TargetPath +
+            // Reason) created by ActionAddReifiedDelete — safe to delete
+            // outright; the real mod's LoadoutFile lives under a different Id.
+            tx.Delete(df, recursive: false);
+        }
+        await tx.Commit();
+
+        return loadout.Rebase();
+    }
+
+    private static bool IsChainDisabled(IDb db, LoadoutItem.ReadOnly item)
+    {
+        if (item.Contains(LoadoutItem.Disabled)) return true;
+        var walker = item.ParentId.Value;
+        var depth = 0;
+        while (walker.Value != 0UL && depth < 16)
+        {
+            var parent = LoadoutItem.Load(db, walker);
+            if (!parent.IsValid()) break;
+            if (parent.Contains(LoadoutItem.Disabled)) return true;
+            if (!parent.Contains(LoadoutItem.Parent)) break;
+            walker = parent.ParentId.Value;
+            depth++;
+        }
+        return false;
     }
 
     public async Task<GameInstallMetadata.ReadOnly> RescanFiles(GameInstallation gameInstallation)
