@@ -61,6 +61,27 @@ public class NxFileStore : IFileStore, IReadOnlyStreamSource
         }
 
         _logger = logger;
+
+        // Sweep leaked .tmp archives from aborted repacks/backups. These sit
+        // next to the real .nx files, each the size of the archive being
+        // produced — a crashed repack of a 50 GB game archive can leave 50 GB
+        // of garbage behind.
+        foreach (var location in _archiveLocations)
+        {
+            foreach (var tmp in location.EnumerateFiles(KnownExtensions.Tmp))
+            {
+                try
+                {
+                    tmp.Delete();
+                    _logger.LogInformation("Removed orphan archive tmp file {Path}", tmp);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "Failed to remove orphan archive tmp file {Path}", tmp);
+                }
+            }
+        }
+
         ReloadCaches();
     }
     
@@ -232,22 +253,33 @@ public class NxFileStore : IFileStore, IReadOnlyStreamSource
         var guid = Guid.NewGuid();
         var id = guid.ToString();
         var outputPath = _archiveLocations.First().Combine(id).AppendExtension(KnownExtensions.Tmp);
-
-        await using (var outputStream = outputPath.Create())
+        var moved = false;
+        try
         {
-            builder.WithOutput(outputStream);
-            builder.Build();
-        }
+            await using (var outputStream = outputPath.Create())
+            {
+                builder.WithOutput(outputStream);
+                builder.Build();
+            }
 
-        foreach (var kv in filesToBackup)
+            foreach (var kv in filesToBackup)
+            {
+                await kv.Value.Item2.DisposeAsync();
+            }
+
+            var finalPath = outputPath.ReplaceExtension(KnownExtensions.Nx);
+            await outputPath.MoveToAsync(finalPath, token: token);
+            moved = true;
+
+            AddArchiveToCache(finalPath, filesToBackup);
+        }
+        finally
         {
-            await kv.Value.Item2.DisposeAsync();
+            if (!moved && outputPath.FileExists)
+            {
+                try { outputPath.Delete(); } catch { /* best-effort cleanup */ }
+            }
         }
-
-        var finalPath = outputPath.ReplaceExtension(KnownExtensions.Nx);
-        await outputPath.MoveToAsync(finalPath, token: token);
-
-        AddArchiveToCache(finalPath, filesToBackup);
     }
 
     /// <inheritdoc />

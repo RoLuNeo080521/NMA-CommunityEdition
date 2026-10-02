@@ -46,17 +46,31 @@ public static class NxRepacker
         var guid = Guid.NewGuid();
         var id = guid.ToString();
         var tmpArchivePath = archive.FilePath.Parent.Combine(id).AppendExtension(KnownExtensions.Tmp);
-        repacker.AddFilesFromNxArchive(fromAbsolutePathProvider, archive.HeaderState.Header, entries)
-            .WithProgress(progress)
-            .WithOutput(tmpArchivePath.Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None));
-        repacker.Build();
-        // Note: There's a flaw with Nx API, the `Build` method should be virtual,
-        //       will fix soonish.
-        
-        // Delete the original archive.
-        newArchivePath = tmpArchivePath.ReplaceExtension(KnownExtensions.Nx);
-        tmpArchivePath.FileSystem.MoveFile(tmpArchivePath, newArchivePath, true);
-        
+        var moved = false;
+        try
+        {
+            repacker.AddFilesFromNxArchive(fromAbsolutePathProvider, archive.HeaderState.Header, entries)
+                .WithProgress(progress)
+                .WithOutput(tmpArchivePath.Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None));
+            repacker.Build();
+            // Note: There's a flaw with Nx API, the `Build` method should be virtual,
+            //       will fix soonish.
+
+            newArchivePath = tmpArchivePath.ReplaceExtension(KnownExtensions.Nx);
+            tmpArchivePath.FileSystem.MoveFile(tmpArchivePath, newArchivePath, true);
+            moved = true;
+        }
+        finally
+        {
+            // On failure the tmp can be dozens of GBs — leaking it fills the disk
+            // across repeated GC attempts (seen with Fallout 4 unmanage: three
+            // orphan .tmp = 102 GB).
+            if (!moved && tmpArchivePath.FileExists)
+            {
+                try { tmpArchivePath.Delete(); } catch { /* best-effort cleanup */ }
+            }
+        }
+
         end:
         if (deleteOriginal)
             fs.DeleteFile(archive.FilePath);
