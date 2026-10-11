@@ -82,6 +82,19 @@ public class RunGameTool<T> : IRunGameTool
 
             if (locatorResult.Store == GameStore.GOG)
             {
+                // Lutris emits its internal numeric game id (from the yml
+                // filename) as its first LocatorId. The Store is GOG for both
+                // Lutris and Heroic, so dispatch by locator type.
+                var isLutris = locatorResult.Locator.GetType().Name == "LutrisGOGLocator";
+                if (isLutris)
+                {
+                    var lutrisId = locatorResult.LocatorIds.FirstOrDefault().Value ?? locatorResult.StoreIdentifier;
+                    if (!program.Equals(primaryFile))
+                        _logger.LogInformation("Delegating launch to Lutris (Linux). Configure `{Program}` in Lutris Game options if needed.", program.FileName);
+                    await RunThroughLutris(lutrisId, cancellationToken, BuildProcessNameSet(program, primaryFile));
+                    return;
+                }
+
                 if (!program.Equals(primaryFile))
                     _logger.LogInformation("Delegating launch to Heroic (Linux). Configure `{Program}` in Heroic launch options if needed.", program.FileName);
                 await RunThroughHeroic("gog", locatorResult.StoreIdentifier, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
@@ -270,6 +283,41 @@ public class RunGameTool<T> : IRunGameTool
             catch (OperationCanceledException) { return null; }
         }
         return null;
+    }
+
+    private async Task RunThroughLutris(string lutrisId, CancellationToken cancellationToken, HashSet<string> processNames)
+    {
+        Debug.Assert(OSInformation.Shared.IsLinux);
+
+        // Lutris URL scheme — https://github.com/lutris/lutris/blob/master/share/applications/net.lutris.Lutris.desktop
+        var lutrisUrl = $"lutris:rungameid/{lutrisId}";
+
+        var existingProcessIds = FindMatchingProcesses(processNames).Select(p => p.Id).ToHashSet();
+
+        _osInterop.OpenUri(new Uri(lutrisUrl));
+
+        // Lutris launches the game under Wine/Proton; wait for the game
+        // process (not the launcher) to appear, then poll it to completion.
+        var startupTimeout = TimeSpan.FromMinutes(3);
+        var startupDeadline = DateTime.UtcNow + startupTimeout;
+        Process? gameProcess = null;
+        while (DateTime.UtcNow < startupDeadline && !cancellationToken.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            gameProcess = FindMatchingProcesses(processNames)
+                .FirstOrDefault(p => !existingProcessIds.Contains(p.Id));
+            if (gameProcess is not null) break;
+        }
+
+        if (gameProcess is null)
+        {
+            _logger.LogWarning("Game process matching `{Names}` did not start within `{Timeout:g}` after Lutris launch for id `{LutrisId}`",
+                string.Join(",", processNames), startupTimeout, lutrisId);
+            return;
+        }
+
+        _logger.LogInformation("Lutris launched `{ProcessName}` (pid {Pid}); waiting for exit", gameProcess.ProcessName, gameProcess.Id);
+        await PollUntilNoMatchingProcessAsync(processNames, existingProcessIds, cancellationToken);
     }
 
     private async Task RunThroughHeroic(string type, string productId, CancellationToken cancellationToken, string[] commandLineArgs, HashSet<string> processNames)

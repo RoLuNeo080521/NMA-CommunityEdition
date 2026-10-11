@@ -47,17 +47,20 @@ CREATE OR REPLACE MACRO file_hashes.steam_loadout_files(db) AS TABLE
 SELECT files.Loadout, files.FileId PathId FROM
     (SELECT Loadout, ManifestId, unnest(Files) FileId
      FROM file_hashes.loadout_locatorids(db) locators
-              LEFT JOIN MDB_STEAMMANIFEST(DbName=>'hashes') manifest ON manifest.ManifestId = locators.LocatorID::UBIGINT
-     WHERE locators.Store = 'Steam') files;
+              LEFT JOIN MDB_STEAMMANIFEST(DbName=>'hashes') manifest ON manifest.ManifestId = TRY_CAST(locators.LocatorID AS UBIGINT)
+     WHERE locators.Store = 'Steam' AND TRY_CAST(locators.LocatorID AS UBIGINT) IS NOT NULL) files;
 
 
 -- gets all the paths and hashes of game files for gog loadouts
 CREATE OR REPLACE MACRO file_hashes.gog_loadout_files(db) AS TABLE
 WITH 
-  -- GOG locatorIds can contain a mix of BuildIds and DLC ProductIds
-  locatorIds AS (SELECT Loadout, LocatorId::UBIGINT LocatorId
+  -- GOG locatorIds can contain a mix of BuildIds and DLC ProductIds. Use
+  -- TRY_CAST so non-numeric entries written by locators that didn't honor
+  -- the UBIGINT contract don't blow up the whole sync — they just skip the
+  -- vanity-version lookup and fall back to the file-version detection.
+  locatorIds AS (SELECT Loadout, TRY_CAST(LocatorId AS UBIGINT) LocatorId
                  FROM file_hashes.loadout_locatorids(db) locators
-                 WHERE locators.Store = 'GOG'), 
+                 WHERE locators.Store = 'GOG' AND TRY_CAST(locators.LocatorId AS UBIGINT) IS NOT NULL), 
   builds AS (SELECT Loadout, BuildId, ProductId BuildProductId, unnest(build.Depots) DepotId
              FROM MDB_GOGBUILD(DBName=>"hashes") build
              INNER JOIN locatorIds ON build.BuildId = locatorIds.LocatorId),
