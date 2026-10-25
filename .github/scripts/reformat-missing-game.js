@@ -67,7 +67,7 @@ ${logs}
   // We may want to post a comment based on the responses.
   let commentBody = '';
   if (store === 'Manually Installed') {
-    commentBody = 'Games installed outside of a game store are not supported. Please install your game using Steam/GOG Galaxy/Heroic Launcher.';
+    commentBody = 'Games installed outside of a game store are not supported. Please install your game using Steam, GOG Galaxy, Heroic or Lutris (GOG games only).';
   }
   else if (store === 'Epic Games Launcher') {
     commentBody = `We currently do not support Epic Games Launcher. Please see this issue for more information: https://github.com/Nexus-Mods/NexusMods.App/issues/3116`
@@ -79,7 +79,7 @@ ${logs}
     commentBody = `We currently only support GOG Games installed with Heroic on Linux. Epic Games are not supported yet.`
   }
   else if (['Linux', 'Steam Deck'].includes(os) && store === 'Lutris') {
-    commentBody = `We currently only support GOG Games installed with Heroic on Linux. Please see this issue for more information: https://github.com/Nexus-Mods/NexusMods.App/issues/1838`
+    commentBody = `We currently only support GOG games installed with Lutris on Linux.`
   }
 
   if (commentBody.length > 0) {
@@ -95,7 +95,7 @@ ${logs}
   }
 
   // If the user has added nonsense to the logs section, automatically flag the issue as such
-  if (!logs.includes('nexusmods.app.main') && !logs.includes('nexusmods.app.slim') && !logs.includes('Nexus Mods App log file')) {
+  if (!logs.includes('nmacommunity.app.main') && !logs.includes('nmacommunity.app.slim') && !logs.includes('Nexus Mods App log file')) {
     console.log('Issue doesn\`t seem to contain valid logs, tagging invalid');
     await octokit.issues.addLabels({
         owner,
