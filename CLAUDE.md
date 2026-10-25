@@ -88,7 +88,21 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 ## CI (GitHub Actions)
 
-- `.github/workflows/build-appimage.yml` se lance à chaque push (toutes branches) et à la demande. Il
-  publie l'artifact `nma-appimage`.
-- Les workflows hérités de Nexus Mods qui font doublon ou sont inutilisables sur le fork ne se lancent
-  plus que manuellement. La raison est indiquée en tête de chaque fichier.
+- `build-appimage.yml` se lance à chaque push (toutes branches), à la demande, et quand `release.yaml`
+  l'appelle. Il publie l'artifact `nma-appimage`.
+- `release.yaml` publie une version (voir « Release » ci-dessous).
+- `issue-maintenance.yaml`, `reformat-missing-game.yaml` (avec `.github/scripts/reformat-missing-game.js`),
+  `stale.yaml` et `pr-maintenance.yaml` automatisent la gestion des issues et des PR.
+
+## Release
+
+1. Prépare une PR qui :
+   - ajoute `.github/release-notes/vX.Y.Z.md`. Claude rédige ces notes à partir des commits depuis le
+     dernier tag, au format des releases précédentes : sections « Highlights » (changements visibles),
+     « Full changelog » (un commit par ligne) et « Install » ;
+   - met `AppVersionRelease` à `X.Y.Z` dans `src/NexusMods.App/app.pupnet.conf`.
+2. Une fois la PR mergée, lance **Actions → Release** avec la version `vX.Y.Z`. Le `v` doit être en
+   minuscule, car le vérificateur de mises à jour de l'app ne retire qu'un `v` minuscule avant de lire la
+   version. Le workflow refuse un tag existant ou des notes absentes. Il compile l'AppImage du commit visé
+   avec cette version, puis crée la release avec l'AppImage seule (en brouillon par défaut).
+3. Teste l'AppImage du brouillon, puis publie la release.
