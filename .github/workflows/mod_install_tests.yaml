@@ -1,17 +1,10 @@
 ﻿name: Mod Install Tests
 
+# NMA Community Edition: automatic triggers disabled (manual run only). It sets up the .NET 8 SDK while the
+# projects target net9.0, calls a `stress-test` verb that no longer exists in src/, and needs NEXUS_API_KEY + the
+# 'test' environment.
 on:
-  schedule:
-    - cron: '0 6 * * *'
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - ".github/workflows/mod_install_tests.yaml"
-      - "./src/**"
-      - "./tests/**"
-      - "**.props"
-      - "**.targets"
 
 jobs:
   build:

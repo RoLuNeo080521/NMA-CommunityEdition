@@ -1,8 +1,10 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). Runs on a
+# self-hosted runner and needs NEXUS_API_KEY + the 'test' environment, none of which exist on the fork,
+# so every push left a job queued with no runner.
 name: Networking Tests
 
 on:
   workflow_dispatch:
-  push:
 
 jobs:
   build:

@@ -1,17 +1,10 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). It deploys
+# to GitHub Pages through the upstream Nexus-Mods/NexusMods.App.Meta workflow; re-enable once GitHub Pages is
+# configured for the fork.
 name: MkDocs build and deploy
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - "mkdocs.yml"
-      - "docs/**"
-  pull_request:
-    branches: [ main ]
-    paths:
-      - "mkdocs.yml"
-      - "docs/**"
 
 jobs:
   build-and-deploy:

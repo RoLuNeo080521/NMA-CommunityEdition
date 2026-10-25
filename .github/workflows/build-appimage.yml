@@ -1,0 +1,88 @@
+name: Build AppImage
+
+# Main build of the NMA Community Edition fork: produces the Linux AppImage
+# from src/NexusMods.App/app.pupnet.conf and publishes it as the "nma-appimage" artifact.
+
+on:
+  push:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ProjectDir: "src/NexusMods.App"
+  PupNetVersion: "1.9.1"
+  AppImageToolVersion: "1.9.1"
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  # Runners have limited disk: hard-link copied dependencies instead of duplicating them
+  # (same options as the Claude Code cloud environment).
+  CreateHardLinksForCopyLocalIfPossible: "true"
+  CreateHardLinksForCopyFilesToOutputDirectoryIfPossible: "true"
+  CreateHardLinksForAdditionalFilesIfPossible: "true"
+  CreateHardLinksForCopyAdditionalFilesIfPossible: "true"
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Disk space (start)
+        run: df -h
+
+      # .NET 9 builds the app (net9.0); PupNet 1.9.1 is a net8.0 tool and needs the .NET 8 runtime,
+      # which comes with the 8.0 SDK.
+      - name: Setup .NET 8 and 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Print debug info
+        run: dotnet --info
+
+      - name: Install PupNet
+        run: dotnet tool install --global KuiperZone.PupNet --version "$PupNetVersion"
+
+      # PupNet >= 1.9.0 no longer embeds appimagetool and expects appimagetool-x86_64.AppImage in $PATH.
+      - name: Install appimagetool
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL -o "$RUNNER_TEMP/bin/appimagetool-x86_64.AppImage" \
+            "https://github.com/AppImage/appimagetool/releases/download/$AppImageToolVersion/appimagetool-x86_64.AppImage"
+          chmod +x "$RUNNER_TEMP/bin/appimagetool-x86_64.AppImage"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # Only the app project is published (dotnet publish through PupNet), not the whole solution with tests.
+      - name: Create AppImage
+        working-directory: ${{ env.ProjectDir }}
+        env:
+          # appimagetool is itself an AppImage: extract and run it instead of mounting it, so FUSE is not needed.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: pupnet -y -k AppImage -p DefineConstants=INSTALLATION_METHOD_APPIMAGE
+
+      - name: Disk space (after build)
+        if: always()
+        run: |
+          df -h
+          du -sh ~/.nuget/packages "$ProjectDir/bin" "$ProjectDir/obj" "$ProjectDir/Deploy" 2>/dev/null || true
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: nma-appimage
+          path: ${{ env.ProjectDir }}/Deploy/OUT/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
