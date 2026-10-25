@@ -56,13 +56,13 @@ jobs:
         run: df -h
 
       # .NET 9 builds the app (net9.0); PupNet 1.9.1 is a net8.0 tool and needs the .NET 8 runtime,
-      # which comes with the 8.0 SDK.
-      - name: Setup .NET 8 and 9
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: |
-            8.0.x
-            9.0.x
+      # which comes with the 8.0 SDK. Both ship with the runner image: no download from Microsoft's CDN,
+      # which can be down (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
+      - name: Check .NET 8 and 9
+        run: |
+          dotnet --list-sdks
+          dotnet --list-sdks | grep -q '^9\.' || { echo "::error::No .NET 9 SDK on the runner image"; exit 1; }
+          dotnet --list-runtimes | grep -q '^Microsoft\.NETCore\.App 8\.' || { echo "::error::No .NET 8 runtime on the runner image"; exit 1; }
 
       - name: Print debug info
         run: dotnet --info
