@@ -45,17 +45,16 @@ jobs:
       - name: Disk space (start)
         run: df -h
 
-      - name: Setup .NET 9
-        id: setup-dotnet
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 9.0.x
-
-      # The runner image also ships a newer SDK, which global.json (rollForward: latestMajor) would select.
-      # From .NET 10 on, `dotnet test` refuses to run the TUnit projects in VSTest mode, so pin this job to SDK 9.
+      # The runner image ships the .NET SDKs: no download from Microsoft's CDN, which can be down
+      # (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
+      # It also ships a newer SDK, which global.json (rollForward: latestMajor) would select. From .NET 10 on,
+      # `dotnet test` refuses to run the TUnit projects in VSTest mode, so pin this job to the newest SDK 9.
       - name: Use the .NET 9 SDK
         run: |
-          dotnet new globaljson --sdk-version "${{ steps.setup-dotnet.outputs.dotnet-version }}" --force
+          dotnet --list-sdks
+          sdk=$(dotnet --list-sdks | awk '/^9\./ { print $1 }' | sort -V | tail -1)
+          if [[ -z "$sdk" ]]; then echo "::error::No .NET 9 SDK on the runner image"; exit 1; fi
+          dotnet new globaljson --sdk-version "$sdk" --force
           dotnet --version
 
       - name: Build
