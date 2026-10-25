@@ -1,11 +1,14 @@
 name: Release
 run-name: Release ${{ inputs.version }}
 
+# Builds the AppImage for the given version and publishes it as a GitHub release.
+# The release notes must be committed beforehand as .github/release-notes/<version>.md.
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "The version to release (eg: 'v1.0.0')"
+        description: "The version to release, with a lowercase v (eg: 'v1.2.0')"
         required: true
         type: string
       target:
@@ -21,160 +24,76 @@ on:
         description: "Create a prerelease?"
         required: false
         type: boolean
-        default: true
-      release-nexus-mods:
-        description: "Release on Nexus Mods?"
-        required: false
-        type: boolean
-        default: false
-      notify-discord:
-        description: "Notify on Discord?"
-        required: false
-        type: boolean
-        default: false
-      notify-slack:
-        description: "Notify on Slack?"
-        required: false
-        type: boolean
         default: false
 
-env:
-  ProjectFile: "src/NexusMods.App/NexusMods.App.csproj"
+permissions:
+  contents: read
 
 jobs:
-  transformInputs:
+  prepare:
     runs-on: ubuntu-latest
     outputs:
-      TagVersion: ${{ steps.setOutputs.outputs.tagVersion }}
-      RawVersion: ${{ steps.setOutputs.outputs.rawVersion }}
-      TargetSha: ${{ steps.setOutputs.outputs.target }}
-      ProjectFile: ${{ steps.setOutputs.outputs.projectFile }}
+      AppVersion: ${{ steps.validate.outputs.appVersion }}
+      TargetSha: ${{ steps.validate.outputs.targetSha }}
 
     steps:
-      - name: Set Outputs
-        id: setOutputs
-        shell: pwsh
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.target || github.sha }}
+
+      - name: Validate version and release notes
+        id: validate
         env:
-          InputVersion: ${{ inputs.version }}
-          InputTarget: ${{ inputs.target }}
-          HeadSha: ${{ github.sha }}
+          Version: ${{ inputs.version }}
         run: |
-          $tagVersion = $env:InputVersion.StartsWith('v') ? $env:InputVersion : "v" + $env:InputVersion
-          $rawVersion = $tagVersion.Substring(1)
-          $target = $env:InputTarget ? $env:InputTarget : $env:HeadSha
-          $validation = [System.Version]::Parse($rawVersion)
-          echo "tagVersion=$tagVersion" >> $env:GITHUB_OUTPUT
-          echo "rawVersion=$rawVersion" >> $env:GITHUB_OUTPUT
-          echo "target=$target" >> $env:GITHUB_OUTPUT
-          echo "projectFile=${{ env.ProjectFile }}" >> $env:GITHUB_OUTPUT
+          # The in-app update checker only strips a lowercase "v" before parsing the tag as a version.
+          if [[ ! "$Version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The version must look like v1.2.0 (lowercase v), got '$Version'"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$Version" >/dev/null; then
+            echo "::error::The tag $Version already exists"
+            exit 1
+          fi
+          if [[ ! -s ".github/release-notes/$Version.md" ]]; then
+            echo "::error::Missing release notes: .github/release-notes/$Version.md"
+            exit 1
+          fi
+          echo "appVersion=${Version#v}" >> "$GITHUB_OUTPUT"
+          echo "targetSha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  build-linux:
-    needs: [ transformInputs ]
-    uses: ./.github/workflows/build-linux-pupnet.yaml
+  build:
+    needs: [ prepare ]
+    uses: ./.github/workflows/build-appimage.yml
     with:
-      AppVersion: ${{ needs.transformInputs.outputs.RawVersion }}
-      Target: ${{ needs.transformInputs.outputs.TargetSha }}
-      # this is a bit of a hack, you can't use environment variables here
-      # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
-      ProjectFile: ${{ needs.transformInputs.outputs.ProjectFile }}
-      RetentionDays: 1
-
-  build-windows:
-    needs: [ transformInputs ]
-    uses: ./.github/workflows/build-windows-pupnet.yaml
-    with:
-      AppVersion: ${{ needs.transformInputs.outputs.RawVersion }}
-      Target: ${{ needs.transformInputs.outputs.TargetSha }}
-      # this is a bit of a hack, you can't use environment variables here
-      # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
-      ProjectFile: ${{ needs.transformInputs.outputs.ProjectFile }}
-      RetentionDays: 1
-      SignExecutable: true
-    secrets:
-      ES_USERNAME: ${{ secrets.ES_USERNAME }}
-      ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
-      ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
-      ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+      AppVersion: ${{ needs.prepare.outputs.AppVersion }}
+      Target: ${{ needs.prepare.outputs.TargetSha }}
 
   release-github:
+    needs: [ prepare, build ]
     runs-on: ubuntu-latest
-    needs: [ transformInputs, build-linux, build-windows ]
-    outputs:
-      GitHubReleaseUrl: ${{ steps.create-gh-release.outputs.url }}
-
     permissions:
       contents: write
-      discussions: write
 
     steps:
-      - name: Get Linux Archive
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
         with:
-          name: ${{ needs.build-linux.outputs.ArtifactNameLinuxArchive }}
-          path: bin/LinuxArchive
+          ref: ${{ needs.prepare.outputs.TargetSha }}
 
-      - name: Get Linux AppImage
-        uses: actions/download-artifact@v4
+      - name: Get AppImage
+        uses: actions/download-artifact@v7
         with:
-          name: ${{ needs.build-linux.outputs.ArtifactNameLinuxAppImage }}
-          path: bin/LinuxAppImage
-
-      - name: Get Windows Archive
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build-windows.outputs.ArtifactNameWindowsArchive }}
-          path: bin/WindowsArchive
-
-      - name: Get Windows Inno Setup
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build-windows.outputs.ArtifactNameWindowsInnoSetup }}
-          path: bin/WindowsInnoSetup
-
-      - name: List Artifacts
-        shell: bash
-        run: tree bin
+          name: nma-appimage
+          path: dist
 
       - name: Create Release
-        id: create-gh-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          name: ${{ needs.transformInputs.outputs.RawVersion }}
-          tag_name: ${{ needs.transformInputs.outputs.TagVersion }}
-          target_commitish: ${{ needs.transformInputs.outputs.TargetSha }}
+          name: NMA Community Edition ${{ inputs.version }}
+          tag_name: ${{ inputs.version }}
+          target_commitish: ${{ needs.prepare.outputs.TargetSha }}
+          body_path: .github/release-notes/${{ inputs.version }}.md
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
-          files: bin/**/*
+          files: dist/*.AppImage
           fail_on_unmatched_files: true
-
-  release-nexus-mods:
-    runs-on: ubuntu-latest
-    needs: [ transformInputs, build-linux, build-windows ]
-
-    steps:
-      - name: Empty
-        if: inputs.release-nexus-mods == true
-        run: exit 0
-
-  notify-discord:
-    runs-on: ubuntu-latest
-    needs: [ release-github, release-nexus-mods ]
-
-    steps:
-      - name: Send Discord notification
-        if: inputs.notify-discord == true
-        uses: appleboy/discord-action@0.0.3
-        with:
-          webhook_id: ${{ secrets.DISCORD_WEBHOOK_ID }}
-          webhook_token: ${{ secrets.DISCORD_WEBHOOK_TOKEN }}
-          message: "New release is available at ${{ needs.release-github.outputs.GitHubReleaseUrl }}"
-          username: "Release Bot"
-
-  notify-slack:
-    runs-on: ubuntu-latest
-    needs: [ release-github, release-nexus-mods ]
-
-    steps:
-      - name: Empty
-        if: inputs.notify-slack == true
-        run: exit 0

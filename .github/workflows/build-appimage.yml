@@ -2,11 +2,24 @@ name: Build AppImage
 
 # Main build of the NMA Community Edition fork: produces the Linux AppImage
 # from src/NexusMods.App/app.pupnet.conf and publishes it as the "nma-appimage" artifact.
+# Also called by release.yaml with the release version and commit.
 
 on:
   push:
     branches: [ "**" ]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      AppVersion:
+        description: "Version passed to PupNet (-v), e.g. 1.2.0. Default: AppVersionRelease from app.pupnet.conf"
+        type: string
+        required: false
+        default: ""
+      Target:
+        description: "Git ref to build. Default: the commit that triggered the workflow"
+        type: string
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,8 +47,9 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.Target || github.sha }}
           submodules: recursive
 
       - name: Disk space (start)
@@ -44,7 +58,7 @@ jobs:
       # .NET 9 builds the app (net9.0); PupNet 1.9.1 is a net8.0 tool and needs the .NET 8 runtime,
       # which comes with the 8.0 SDK.
       - name: Setup .NET 8 and 9
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -71,7 +85,14 @@ jobs:
         env:
           # appimagetool is itself an AppImage: extract and run it instead of mounting it, so FUSE is not needed.
           APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: pupnet -y -k AppImage -p DefineConstants=INSTALLATION_METHOD_APPIMAGE
+          AppVersion: ${{ inputs.AppVersion }}
+        run: |
+          args=(-y -k AppImage -p DefineConstants=INSTALLATION_METHOD_APPIMAGE)
+          # The version also becomes the app's own version, which the in-app update checker compares to release tags.
+          if [[ -n "$AppVersion" ]]; then
+            args+=(-v "$AppVersion")
+          fi
+          pupnet "${args[@]}"
 
       - name: Disk space (after build)
         if: always()
@@ -80,7 +101,7 @@ jobs:
           du -sh ~/.nuget/packages "$ProjectDir/bin" "$ProjectDir/obj" "$ProjectDir/Deploy" 2>/dev/null || true
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: nma-appimage
           path: ${{ env.ProjectDir }}/Deploy/OUT/*.AppImage
