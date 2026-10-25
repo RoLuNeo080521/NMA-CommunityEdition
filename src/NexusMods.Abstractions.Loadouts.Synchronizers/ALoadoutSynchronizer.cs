@@ -998,13 +998,6 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     {
         loadout = loadout.Rebase();
 
-        // Drop duplicate LoadoutFile entries for the same target path before
-        // building the sync tree. The SQL tie-break in WinningLeafLoadoutItem
-        // already picks the newest, so duplicates are harmless at read time —
-        // this is purely hygiene to keep the DB from accumulating stale entries
-        // left by aborted retires or repeated installs of the same mod.
-        loadout = await GcDuplicateLoadoutFiles(loadout);
-
         // Retract stale DeletedFile markers that co-exist with an active
         // LoadoutFile on the same LoadoutItem. This happens when the user
         // manually removes a game folder / subtree that NMA still tracks:
@@ -1038,51 +1031,6 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         // Move any override files that now match game files after sync
         loadout = await ReprocessOverrides(loadout);
         return loadout;
-    }
-
-    /// <summary>
-    /// Deletes superseded LoadoutFile entries — same (loadout, target path) as
-    /// a newer entry — so the DB doesn't accumulate ghosts from past install /
-    /// retire / re-install cycles. Only the highest-Id row per path is kept.
-    /// The SQL <c>WinningLeafLoadoutItem</c> macro already filters duplicates
-    /// at read time; this is the write-side counterpart that frees DB space.
-    /// </summary>
-    private async Task<Loadout.ReadOnly> GcDuplicateLoadoutFiles(Loadout.ReadOnly loadout)
-    {
-        var groups = new Dictionary<(LocationId, RelativePath), List<(EntityId Id, LoadoutFile.ReadOnly Entry)>>();
-        foreach (var file in LoadoutFile.All(loadout.Db))
-        {
-            var item = file.AsLoadoutItemWithTargetPath();
-            if (!item.AsLoadoutItem().LoadoutId.Equals(loadout.LoadoutId)) continue;
-
-            var key = (item.TargetPath.Item2, item.TargetPath.Item3);
-            if (!groups.TryGetValue(key, out var list))
-            {
-                list = new List<(EntityId, LoadoutFile.ReadOnly)>(capacity: 1);
-                groups[key] = list;
-            }
-            list.Add((file.Id, file));
-        }
-
-        var losers = new List<EntityId>();
-        foreach (var list in groups.Values)
-        {
-            if (list.Count < 2) continue;
-            // Keep the most recently inserted row; retract the rest.
-            list.Sort((a, b) => b.Id.Value.CompareTo(a.Id.Value));
-            for (var i = 1; i < list.Count; i++)
-                losers.Add(list[i].Id);
-        }
-
-        if (losers.Count == 0) return loadout;
-
-        Logger.LogInformation("Pruning {Count} duplicate LoadoutFile entries from loadout {LoadoutId}", losers.Count, loadout.LoadoutId);
-        using var tx = Connection.BeginTransaction();
-        foreach (var id in losers)
-            tx.Delete(id, recursive: true);
-        await tx.Commit();
-
-        return loadout.Rebase();
     }
 
     /// <summary>
