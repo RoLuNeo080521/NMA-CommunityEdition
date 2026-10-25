@@ -78,7 +78,10 @@ public class FileStoreTests : ACyberpunkIsolatedGameTest<FileStoreTests>
         var ms = new MemoryStream(buffer: bytes);
         var entry = new ArchivedFileEntry(new MemoryStreamFactory("", ms), Hash: Hash.Zero, Size.FromLong(ms.Length));
 
+        // The fork logs and skips files whose hash doesn't match instead of failing the whole backup.
         var act = async () => await _fileStore.BackupFiles([entry], deduplicate: false);
-        await act.Should().ThrowAsync<KeyNotFoundException>(because: "file requested to be backed up doesn't exist in the archive due to bad hash");
+        await act.Should().NotThrowAsync();
+
+        (await _fileStore.HaveFile(Hash.Zero)).Should().BeFalse(because: "file requested to be backed up doesn't exist in the archive due to bad hash");
     }
 }

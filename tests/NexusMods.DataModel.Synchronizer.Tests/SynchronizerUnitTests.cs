@@ -1,3 +1,4 @@
+using System.Text;
 using FluentAssertions;
 using MartinCostello.Logging.XUnit;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,8 +8,12 @@ using NexusMods.Games.RedEngine.Cyberpunk2077;
 using NexusMods.Games.TestFramework;
 using NexusMods.Games.TestFramework.FluentAssertionExtensions;
 using NexusMods.Hashing.xxHash3;
+using NexusMods.MnemonicDB.Abstractions;
 using NexusMods.MnemonicDB.Abstractions.TxFunctions;
+using NexusMods.Paths;
+using NexusMods.Sdk.FileStore;
 using NexusMods.Sdk.Games;
+using NexusMods.Sdk.IO;
 using NexusMods.Sdk.Loadouts;
 using NexusMods.StandardGameLocators.TestHelpers;
 using Xunit.Abstractions;
@@ -112,26 +117,34 @@ public class SynchronizerUnitTests(ITestOutputHelper testOutputHelper) : ACyberp
         var path = new GamePath(LocationId.Game, "duplicated/file.txt");
 
         // Old entry first → gets a lower EntityId.
-        LoadoutFileId staleFileId;
+        // AddFile returns a temporary id, so remap it to the permanent one after the commit.
+        EntityId staleFileId;
         Hash newHash;
         using (var tx = Connection.BeginTransaction())
         {
             var staleGroup = AddEmptyGroup(tx, loadout.LoadoutId, "stale-group");
-            staleFileId = AddFile(tx, loadout.LoadoutId, staleGroup, path, content: "stale", out _, out _);
-            await tx.Commit();
+            var tmpId = AddFile(tx, loadout.LoadoutId, staleGroup, path, content: "stale", out _, out _);
+            staleFileId = (await tx.Commit())[tmpId.Value];
         }
 
         // Newer entry second → higher EntityId, must win.
-        LoadoutFileId newFileId;
+        EntityId newFileId;
         using (var tx = Connection.BeginTransaction())
         {
             var freshGroup = AddEmptyGroup(tx, loadout.LoadoutId, "fresh-group");
-            newFileId = AddFile(tx, loadout.LoadoutId, freshGroup, path, content: "fresh", out newHash, out _);
-            await tx.Commit();
+            var tmpId = AddFile(tx, loadout.LoadoutId, freshGroup, path, content: "fresh", out newHash, out _);
+            newFileId = (await tx.Commit())[tmpId.Value];
         }
 
-        ((ulong)newFileId.Value).Should().BeGreaterThan((ulong)staleFileId.Value,
+        ((ulong)newFileId).Should().BeGreaterThan((ulong)staleFileId,
             "the test relies on tx order producing a higher Id for the new entry");
+
+        // AddFile only creates the database entries: back up both contents so the synchronizer can extract them.
+        await FileStore.BackupFiles(new[] { "stale", "fresh" }.Select(content =>
+        {
+            var bytes = Encoding.UTF8.GetBytes(content);
+            return new ArchivedFileEntry(new MemoryStreamFactory(path.FileName, new MemoryStream(bytes)), bytes.xxHash3(), Size.FromLong(bytes.Length));
+        }).ToArray());
 
         loadout = loadout.Rebase();
         loadout = await Synchronizer.Synchronize(loadout);

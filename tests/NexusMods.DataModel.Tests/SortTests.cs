@@ -18,7 +18,8 @@ public class SortTests
 
         var act = () => new Sorter().Sort<Item, string>(items, x => x.Id, x => x.Rules).ToArray();
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Cyclic dependency detected");
+        // The fork breaks cycles instead of throwing, so contradictory rules no longer block a whole install.
+        act.Should().NotThrow().Which.Select(x => x.Id).Should().BeEquivalentTo("A", "B");
     }
 
     [Fact]
@@ -36,8 +37,9 @@ public class SortTests
 
         var act = () => new Sorter().Sort(items, x => x.Id, x => x.Rules).ToArray();
 
-        // NOTE(erri120): This is completely misleading but that's the exception we currently get for missing items
-        act.Should().Throw<InvalidOperationException>().WithMessage("Cyclic dependency detected");
+        // Rules pointing at missing items are unsatisfiable, so they go through the same cycle-breaking path:
+        // every item is still returned instead of throwing.
+        act.Should().NotThrow().Which.Select(x => x.Id).Should().BeEquivalentTo("B", "D", "E");
     }
 
     [Fact]

@@ -117,7 +117,7 @@ The mod has been disabled, but not yet synched
 
 
 ## 6 - Loadout A Synced:
-Loadout A has been synchronized, the mod files shouldn't show back up.
+Loadout A has been synchronized, the mod is disabled so its files are not on disk.
 ### Initial State - (0)
 | Path | Hash | Size |
 | --- | --- | --- |
@@ -163,24 +163,25 @@ Re-enable the mod.
 
 
 ## 7 - Loadout A Synced:
-Re-enable the mod.
+Loadout A has been synchronized, re-enabling the mod restored its deleted file.
 ### Initial State - (0)
 | Path | Hash | Size |
 | --- | --- | --- |
-### Last Synced State - (1)
+### Last Synced State - (2)
 | Path | Hash | Size |
 | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |
-### Current State - (1)
+| {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |
+### Current State - (2)
 | Path | Hash | Size |
 | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |
-### Loadout A - (3)
+| {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |
+### Loadout A - (2)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |   |   |
 | {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |   |   |
-| {Game, bin/x64/ThisIsATestFile.txt} |  |  |   | Deleted |
 ### Loadout B - (0)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |
@@ -188,7 +189,7 @@ Re-enable the mod.
 
 
 ## 8 - Loadout B Synced:
-Loadout B has been synchronized, the file should still be deleted as well as the other mod file.
+Loadout B has been synchronized, the mod files are not in this loadout.
 ### Initial State - (0)
 | Path | Hash | Size |
 | --- | --- | --- |
@@ -198,12 +199,11 @@ Loadout B has been synchronized, the file should still be deleted as well as the
 ### Current State - (0)
 | Path | Hash | Size |
 | --- | --- | --- |
-### Loadout A - (3)
+### Loadout A - (2)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |   |   |
 | {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |   |   |
-| {Game, bin/x64/ThisIsATestFile.txt} |  |  |   | Deleted |
 ### Loadout B - (0)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |
@@ -211,24 +211,25 @@ Loadout B has been synchronized, the file should still be deleted as well as the
 
 
 ## 9 - Loadout A Synced:
-Loadout A has been synchronized, the file should still be deleted but the other file in the mod should be back.
+Loadout A has been synchronized, both mod files should be back.
 ### Initial State - (0)
 | Path | Hash | Size |
 | --- | --- | --- |
-### Last Synced State - (1)
+### Last Synced State - (2)
 | Path | Hash | Size |
 | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |
-### Current State - (1)
+| {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |
+### Current State - (2)
 | Path | Hash | Size |
 | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |
-### Loadout A - (3)
+| {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |
+### Loadout A - (2)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |
 | {Game, bin/x64/And Another One.txt} | 0xC72C2583631D647F | 19 B |   |   |
 | {Game, bin/x64/ThisIsATestFile.txt} | 0x673E3C493921A2D5 | 12 B |   |   |
-| {Game, bin/x64/ThisIsATestFile.txt} |  |  |   | Deleted |
 ### Loadout B - (0)
 | Path | Hash | Size | Disabled | Deleted |
 | --- | --- | --- | --- | --- |

@@ -3,7 +3,7 @@
     event: my first event,
     properties: {
       time: 0,
-      app_name: Nexus Mods App,
+      app_name: NMA Community Edition,
       app_version: {{app_version}},
       platform_type: app,
       token: Guid_1,
@@ -21,7 +21,7 @@
     event: my second event,
     properties: {
       time: 0,
-      app_name: Nexus Mods App,
+      app_name: NMA Community Edition,
       app_version: {{app_version}},
       platform_type: app,
       token: Guid_1,
@@ -39,7 +39,7 @@
     event: my second event,
     properties: {
       time: 0,
-      app_name: Nexus Mods App,
+      app_name: NMA Community Edition,
       app_version: {{app_version}},
       platform_type: app,
       token: Guid_1,
@@ -57,7 +57,7 @@
     event: my second event,
     properties: {
       time: 0,
-      app_name: Nexus Mods App,
+      app_name: NMA Community Edition,
       app_version: {{app_version}},
       platform_type: app,
       token: Guid_1,
@@ -75,7 +75,7 @@
     event: my second event,
     properties: {
       time: 0,
-      app_name: Nexus Mods App,
+      app_name: NMA Community Edition,
       app_version: {{app_version}},
       platform_type: app,
       token: Guid_1,

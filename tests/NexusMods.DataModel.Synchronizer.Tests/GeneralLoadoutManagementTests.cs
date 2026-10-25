@@ -227,7 +227,7 @@ public class GeneralLoadoutManagementTests(ITestOutputHelper helper) : ACyberpun
     }
 
     [Fact]
-    public async Task DeletedFilesStayDeletedWhenModIsReenabled()
+    public async Task DeletedFilesAreRestoredWhenModIsReenabled()
     {
         var sb = new StringBuilder();
         var loadoutA = await CreateLoadout();
@@ -271,6 +271,8 @@ public class GeneralLoadoutManagementTests(ITestOutputHelper helper) : ACyberpun
             A mod file has been deleted from disk, so that information should be synced to the loadout.
             """, [loadoutA, loadoutB]);
         
+        loadoutA = await Synchronizer.Synchronize(loadoutA);
+        diskPath.FileExists.Should().BeFalse("A file deleted while its mod is enabled stays deleted");
 
         using var tx = Connection.BeginTransaction();
         tx.Add(mod, LoadoutItem.Disabled, Null.Instance);
@@ -287,7 +289,7 @@ public class GeneralLoadoutManagementTests(ITestOutputHelper helper) : ACyberpun
         
         LogDiskState(sb, "## 6 - Loadout A Synced",
             """
-            Loadout A has been synchronized, the mod files shouldn't show back up.
+            Loadout A has been synchronized, the mod is disabled so its files are not on disk.
             """, [loadoutA, loadoutB]);
         
         // Re-enable the mod
@@ -306,29 +308,29 @@ public class GeneralLoadoutManagementTests(ITestOutputHelper helper) : ACyberpun
         
         LogDiskState(sb, "## 7 - Loadout A Synced",
             """
-            Re-enable the mod.
+            Loadout A has been synchronized, re-enabling the mod restored its deleted file.
             """, [loadoutA, loadoutB]);
         
-        diskPath.FileExists.Should().BeFalse("The file should still be deleted");
+        diskPath.FileExists.Should().BeTrue("Re-enabling the mod restores its deleted files");
         
         loadoutB = await Synchronizer.Synchronize(loadoutB);
         
         LogDiskState(sb, "## 8 - Loadout B Synced",
             """
-            Loadout B has been synchronized, the file should still be deleted as well as the other mod file.
+            Loadout B has been synchronized, the mod files are not in this loadout.
             """, [loadoutA, loadoutB]);
         
-        diskPath.FileExists.Should().BeFalse("The file should still be deleted");
+        diskPath.FileExists.Should().BeFalse("The file is in a mod not in this loadout");
         otherDiskPath.FileExists.Should().BeFalse("The other file is in a mod not in this loadout");
         
         loadoutA = await Synchronizer.Synchronize(loadoutA);
         
         LogDiskState(sb, "## 9 - Loadout A Synced",
             """
-            Loadout A has been synchronized, the file should still be deleted but the other file in the mod should be back.
+            Loadout A has been synchronized, both mod files should be back.
             """, [loadoutA, loadoutB]);
         
-        diskPath.FileExists.Should().BeFalse("The file should still be deleted");
+        diskPath.FileExists.Should().BeTrue("The mod was re-enabled, so this file is back too");
         otherDiskPath.FileExists.Should().BeTrue("This file is not deleted and is in a mod in this loadout");
         
         await Verify(sb.ToString(), extension: "md");
