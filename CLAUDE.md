@@ -60,6 +60,23 @@ dotnet build --configuration Release \
 
 En cas de « no space left on device », supprime les dossiers `bin/` et `obj/` puis relance le build.
 
+## Tests
+
+Même règle que pour le build : sortie dans un fichier, n'afficher que les résumés et les tests en échec.
+
+```bash
+dotnet test --configuration Release --filter "RequiresNetworking!=True&FlakeyTest!=True" > /tmp/test.log 2>&1
+grep -E "^(Passed|Failed|Skipped)! |^\s+Failed |^\s+(total|failed|succeeded):" /tmp/test.log
+```
+
+- La plupart des projets utilisent xunit (une ligne `Passed!`/`Failed!` par projet). `NexusMods.Backend.Tests`
+  et `NexusMods.Sdk.Tests` utilisent TUnit (lignes `total:`/`failed:`/`succeeded:`).
+- Les tests marqués `[Trait("RequiresNetworking", "True")]` ont besoin du réseau, et certains d'une clé
+  `NEXUS_API_KEY`. Le filtre les exclut, en CI comme dans la VM cloud (qui bloque github.com). Marque ainsi
+  tout nouveau test qui fait un appel HTTP réel.
+- Tests de snapshot (Verify) : en cas d'écart, un fichier `*.received.*` (ignoré par git) apparaît à côté du
+  `*.verified.*`. Compare-les ; si le changement est voulu, renomme le `.received` en `.verified`.
+
 ## Packaging (AppImage)
 
 La configuration PupNet est dans `src/NexusMods.App/app.pupnet.conf`. Il faut :
@@ -90,6 +107,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 - `build-appimage.yml` se lance à chaque push (toutes branches), à la demande, et quand `release.yaml`
   l'appelle. Il publie l'artifact `nma-appimage`.
+- `tests.yml` lance les tests (même filtre que ci-dessus) à chaque push qui touche au code.
 - `release.yaml` publie une version (voir « Release » ci-dessous).
 - `issue-maintenance.yaml`, `reformat-missing-game.yaml` (avec `.github/scripts/reformat-missing-game.js`),
   `stale.yaml` et `pr-maintenance.yaml` automatisent la gestion des issues et des PR.
