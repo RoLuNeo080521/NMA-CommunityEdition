@@ -71,6 +71,8 @@ grep -E "^(Passed|Failed|Skipped)! |^\s+Failed |^\s+(total|failed|succeeded):" /
 
 - La plupart des projets utilisent xunit (une ligne `Passed!`/`Failed!` par projet). `NexusMods.Backend.Tests`
   et `NexusMods.Sdk.Tests` utilisent TUnit (lignes `total:`/`failed:`/`succeeded:`).
+- Avec un SDK .NET 10 ou plus récent, `dotnet test` refuse les projets TUnit (« Testing with VSTest target is no
+  longer supported… »). Lance les tests avec un SDK 9 ; la CI l'épingle via un `global.json` généré.
 - Les tests marqués `[Trait("RequiresNetworking", "True")]` ont besoin du réseau, et certains d'une clé
   `NEXUS_API_KEY`. Le filtre les exclut, en CI comme dans la VM cloud (qui bloque github.com). Marque ainsi
   tout nouveau test qui fait un appel HTTP réel.
