@@ -80,9 +80,10 @@ public sealed class DownloadsService : IDownloadsService, IDisposable
                                     if (existingItem.HasValue)
                                     {
                                         var completedDownload = existingItem.Value;
-                                        MarkJobAsCompleted(completedDownload);
-                                        // Clean up observable subscriptions
+                                        // Clean up observable subscriptions first, so a late update from the
+                                        // HTTP job can't overwrite the completed state set below.
                                         completedDownload.Subscriptions?.Dispose();
+                                        MarkJobAsCompleted(completedDownload);
                                     }
                                 }
                                 else
@@ -257,6 +258,10 @@ public sealed class DownloadsService : IDownloadsService, IDisposable
 
     private static void MarkJobAsCompleted(DownloadInfo downloadInfo)
     {
+        // The Nexus Mods job completed. Don't rely on the HTTP job's status update having arrived
+        // before its subscription was disposed, otherwise the download would stay active forever.
+        downloadInfo.SetStatus(JobStatus.Completed);
+
         // Reset transient properties that are only relevant for active downloads
         downloadInfo.SetTransferRate(Size.From(0));
         
