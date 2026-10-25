@@ -1,0 +1,27 @@
+﻿[
+  {
+    FromPath: r6/tweaks/mymod/config.yaml,
+    Hash: 0x44182006928A2F34,
+    ToGamePath: {Game}/r6/tweaks/mymod/config.yaml
+  },
+  {
+    FromPath: r6/scripts/MyMod/Core.reds,
+    Hash: 0xC5E327F0AAB80185,
+    ToGamePath: {Game}/r6/scripts/MyMod/Core.reds
+  },
+  {
+    FromPath: archive/pc/mod/mymod.archive,
+    Hash: 0x22D555EDAEF56251,
+    ToGamePath: {Game}/archive/pc/mod/mymod.archive
+  },
+  {
+    FromPath: archive/pc/mod/mymod.xl,
+    Hash: 0x8198309D0B89E6B4,
+    ToGamePath: {Game}/archive/pc/mod/mymod.xl
+  },
+  {
+    FromPath: r6/scripts/MyMod/HubMenu/Stats.reds,
+    Hash: 0x53D8AB095934311E,
+    ToGamePath: {Game}/r6/scripts/MyMod/HubMenu/Stats.reds
+  }
+]
