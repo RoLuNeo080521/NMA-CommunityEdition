@@ -20,6 +20,7 @@ public class SMAPIGameVersionDiagnosticEmitterTests : ALoadoutDiagnosticEmitterT
     }
 
     [Theory]
+    [Trait("RequiresNetworking", "True")] // fetches the mappings from github.com/erri120/smapi-versions
     [InlineData("1.6.12", "4.1.6")]
     [InlineData("1.5.6", "3.18.6")]
     public async Task Test_TryGetLastSupportedSMAPIVersion(string rawGameVersion, string rawExpectedSMAPIVersion)
