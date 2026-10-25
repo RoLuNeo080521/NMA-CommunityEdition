@@ -46,9 +46,17 @@ jobs:
         run: df -h
 
       - name: Setup .NET 9
+        id: setup-dotnet
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 9.0.x
+
+      # The runner image also ships a newer SDK, which global.json (rollForward: latestMajor) would select.
+      # From .NET 10 on, `dotnet test` refuses to run the TUnit projects in VSTest mode, so pin this job to SDK 9.
+      - name: Use the .NET 9 SDK
+        run: |
+          dotnet new globaljson --sdk-version "${{ steps.setup-dotnet.outputs.dotnet-version }}" --force
+          dotnet --version
 
       - name: Build
         run: dotnet build --configuration Release
