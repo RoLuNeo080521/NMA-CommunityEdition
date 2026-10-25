@@ -1,9 +1,10 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). It would
+# publish the NexusMods.* packages to nuget.org with the upstream NUGET_KEY secret on every v* tag (including the
+# tags created by release.yaml). The fork does not publish to NuGet.
 name: Publish NuGet Packages
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 jobs:
   get-version:

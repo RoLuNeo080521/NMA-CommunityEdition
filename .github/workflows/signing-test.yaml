@@ -1,10 +1,8 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). Signs the
+# Windows build with upstream SSL.com secrets (ES_*) that the fork does not have, so the weekly run always failed.
 name: Signing Test
 
 on:
-  schedule:
-    # At 14:05 on Wednesday
-    # https://crontab.guru
-    - cron: '5 14 * * 3'
   workflow_dispatch:
 
 env:

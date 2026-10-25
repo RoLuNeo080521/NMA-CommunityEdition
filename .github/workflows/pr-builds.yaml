@@ -1,17 +1,10 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). The Linux
+# AppImage build duplicates build-appimage.yml (which already runs on every push, PR branches included) and the
+# Windows builds are not a target of the fork.
 name: PR Builds
 
 on:
-  pull_request:
-    branches: [ main ]
-    paths:
-      - ".github/workflows/pr-builds.yaml"
-      - "src/**"
-      - "tests/**"
-      - "**.props"
-      - "**.targets"
-      - "**.sln"
-      - "**.csproj"
-    types: [ opened, synchronize, reopened, ready_for_review ]
+  workflow_dispatch:
 
 env:
   ProjectFile: "src/NexusMods.App/NexusMods.App.csproj"

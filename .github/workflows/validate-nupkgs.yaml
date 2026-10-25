@@ -1,19 +1,9 @@
+# NMA Community Edition: automatic triggers disabled (manual run only). The fork does
+# not publish NuGet packages, and this daily job packs the whole solution, which is heavy on runner disk.
 name: Validate NuGet packages
 
 on:
-  schedule:
-    - cron: '0 9 * * *'
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/validate-nupkgs.yaml'
-      - '**.csproj'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/validate-nupkgs.yaml'
-      - '**.csproj'
 
 jobs:
   build:
