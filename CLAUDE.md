@@ -50,6 +50,20 @@ git submodule update --init --recursive
 dotnet build --configuration Release
 ```
 
+### Sortie du build
+
+Pour compiler, redirige toujours la sortie vers un fichier, puis n'affiche que les erreurs et le résumé.
+**N'affiche jamais les avertissements**, sauf demande explicite.
+
+```bash
+dotnet build --configuration Release > /tmp/build.log 2>&1
+grep -E "error|Build succeeded|Build FAILED" /tmp/build.log | grep -v ': warning ' | tail -50
+```
+
+Le `grep -v ': warning '` est indispensable, car des avertissements contiennent le mot « error » :
+CS8785 (« compilation errors may occur ») et CS0618 (« double dispose error »). Sans ce filtre, 49 des
+50 lignes affichées sont des avertissements.
+
 ### Espace disque (VM cloud)
 
 Le build complet de la solution (34 projets de test inclus) **remplit le disque de la VM cloud**
