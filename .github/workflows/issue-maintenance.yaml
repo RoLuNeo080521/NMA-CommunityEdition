@@ -14,12 +14,12 @@ jobs:
 
     steps:
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
             Thanks for opening this issue! To help us resolve the issue, please upload the logs from the app.
-            You can find a guide on how to find the logs [here](https://nexus-mods.github.io/NexusMods.App/users/faq/LogFiles/).
+            On Linux they are in `~/.local/state/NMAcommunity.App/Logs/` (files starting with `nmacommunity.app.main.` and `nmacommunity.app.slim.`).
 
   on_close:
     if: github.event.action == 'closed' && github.event.issue.state_reason == 'completed' && contains(github.event.issue.labels.*.name, 'user raised')
@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Create comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
