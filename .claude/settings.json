@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && git submodule update --init --recursive",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
