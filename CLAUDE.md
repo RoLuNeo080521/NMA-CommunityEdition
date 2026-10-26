@@ -116,6 +116,10 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 ## Release
 
+Numérotation `MAJEUR.MINEUR.CORRECTIF` : un correctif (1.2.1) pour des corrections de bugs ou une mise à
+jour de .NET ou des dépendances ; une mineure (1.3.0) pour une nouveauté visible (jeu, lanceur, fonction) ;
+une majeure (2.0.0) pour un changement qui casse l'existant (données plus lisibles, plateforme abandonnée).
+
 1. Une PR :
    - ajoute `.github/release-notes/vX.Y.Z.md`, que Claude rédige à partir des commits depuis le dernier
      tag, au format de `v1.2.0.md` : « Highlights » (changements visibles), « Full changelog » (un commit
