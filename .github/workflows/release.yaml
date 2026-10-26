@@ -46,7 +46,7 @@ jobs:
         env:
           Version: ${{ inputs.version }}
         run: |
-          # The in-app update checker only strips a lowercase "v" before parsing the tag as a version.
+          # Versions 1.1.0 and older of the app only strip a lowercase "v" before parsing the tag as a version.
           if [[ ! "$Version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::The version must look like v1.2.0 (lowercase v), got '$Version'"
             exit 1
