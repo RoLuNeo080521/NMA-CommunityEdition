@@ -82,16 +82,21 @@ public class RunGameTool<T> : IRunGameTool
 
             if (locatorResult.Store == GameStore.GOG)
             {
-                // Lutris emits its internal numeric game id (from the yml
-                // filename) as its first LocatorId. The Store is GOG for both
+                // Lutris runs its games by library slug, which the Lutris
+                // locator reports as LauncherGameId. The Store is GOG for both
                 // Lutris and Heroic, so dispatch by locator type.
                 var isLutris = locatorResult.Locator.GetType().Name == "LutrisGOGLocator";
                 if (isLutris)
                 {
-                    var lutrisId = locatorResult.LocatorIds.FirstOrDefault().Value ?? locatorResult.StoreIdentifier;
+                    if (locatorResult.LauncherGameId is null)
+                    {
+                        _logger.LogWarning("Can't launch the game through Lutris: its Lutris config has no `game_slug`");
+                        return;
+                    }
+
                     if (!program.Equals(primaryFile))
                         _logger.LogInformation("Delegating launch to Lutris (Linux). Configure `{Program}` in Lutris Game options if needed.", program.FileName);
-                    await RunThroughLutris(lutrisId, cancellationToken, BuildProcessNameSet(program, primaryFile));
+                    await RunThroughLutris(locatorResult.LauncherGameId, cancellationToken, BuildProcessNameSet(program, primaryFile));
                     return;
                 }
 
@@ -285,12 +290,13 @@ public class RunGameTool<T> : IRunGameTool
         return null;
     }
 
-    private async Task RunThroughLutris(string lutrisId, CancellationToken cancellationToken, HashSet<string> processNames)
+    private async Task RunThroughLutris(string lutrisSlug, CancellationToken cancellationToken, HashSet<string> processNames)
     {
         Debug.Assert(OSInformation.Shared.IsLinux);
 
         // Lutris URL scheme — https://github.com/lutris/lutris/blob/master/share/applications/net.lutris.Lutris.desktop
-        var lutrisUrl = $"lutris:rungameid/{lutrisId}";
+        // `rungame` looks the game up by slug; `rungameid` would need the id from Lutris' database.
+        var lutrisUrl = $"lutris:rungame/{lutrisSlug}";
 
         var existingProcessIds = FindMatchingProcesses(processNames).Select(p => p.Id).ToHashSet();
 
@@ -311,8 +317,8 @@ public class RunGameTool<T> : IRunGameTool
 
         if (gameProcess is null)
         {
-            _logger.LogWarning("Game process matching `{Names}` did not start within `{Timeout:g}` after Lutris launch for id `{LutrisId}`",
-                string.Join(",", processNames), startupTimeout, lutrisId);
+            _logger.LogWarning("Game process matching `{Names}` did not start within `{Timeout:g}` after Lutris launch for slug `{LutrisSlug}`",
+                string.Join(",", processNames), startupTimeout, lutrisSlug);
             return;
         }
 
