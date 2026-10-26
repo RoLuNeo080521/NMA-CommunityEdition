@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C /var/home/serveur/NexusMods.App remote -v)"
-    ]
-  }
-}

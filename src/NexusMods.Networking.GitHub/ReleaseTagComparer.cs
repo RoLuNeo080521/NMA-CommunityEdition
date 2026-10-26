@@ -26,10 +26,12 @@ public class ReleaseTagComparer : IComparer<Release>
         Debug.Assert(x is not null);
         Debug.Assert(y is not null);
 
-        if (!x.TryGetVersion(out var a)) return -1;
-        if (!y.TryGetVersion(out var b)) return -1;
+        // Releases whose tag isn't a version sort first, so they're never picked as the latest
+        var hasA = x.TryGetVersion(out var a);
+        var hasB = y.TryGetVersion(out var b);
+        if (!hasA || !hasB) return hasA.CompareTo(hasB);
 
-        return a.CompareTo(b);
+        return a!.CompareTo(b);
     }
 }
 
@@ -44,8 +46,9 @@ public static class ReleaseExtensions
     /// </summary>
     public static bool TryGetVersion(this Release release, [NotNullWhen(true)] out Version? version)
     {
+        // The first releases of the fork were tagged `V1.0.0`
         var tagName = release.TagName.AsSpan();
-        if (tagName.StartsWith('v'))
+        if (tagName.StartsWith('v') || tagName.StartsWith('V'))
             tagName = tagName[1..];
 
         return Version.TryParse(tagName, out version);

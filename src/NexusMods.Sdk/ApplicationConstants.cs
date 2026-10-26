@@ -175,9 +175,10 @@ public static class ApplicationConstants
     private static readonly Version FallbackVersion = new(0, 0, 1);
 
     /// <summary>
-    /// Default user agent application name.
+    /// Default user agent application name, also sent as the application name to the Nexus Mods API.
+    /// It names this fork rather than the official app: no spaces, it's a User-Agent product token.
     /// </summary>
-    private const string DefaultUserAgentName = "NexusModsApp";
+    private const string DefaultUserAgentName = "NMACommunityEdition";
 
 #endregion
 }

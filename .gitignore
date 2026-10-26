@@ -42,3 +42,6 @@ coverage.json
 
 # python virtual environment
 .venv
+
+# Claude Code personal settings
+.claude/settings.local.json

@@ -54,7 +54,8 @@ public class Program
         using (var settingsHost = BuildSettingsHost())
         {
             var settingsManager = settingsHost.Services.GetRequiredService<ISettingsManager>();
-            trackingSettings = settingsManager.Get<TrackingSettings>();
+            // No diagnostic or usage data goes to Nexus Mods, even if an older version saved the setting as enabled
+            trackingSettings = settingsManager.Get<TrackingSettings>() with { EnableTracking = false };
             loggingSettings = settingsManager.Get<LoggingSettings>();
             experimentalSettings = settingsManager.Get<ExperimentalSettings>();
             gameLocatorSettings = settingsManager.Get<GameLocatorSettings>();
