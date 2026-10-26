@@ -59,6 +59,11 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     private readonly StringPool _fileNamePool = new();
 
     /// <summary>
+    /// Game folders as first indexed, by the transaction that indexed them.
+    /// </summary>
+    private readonly ConcurrentDictionary<EntityId, (GamePath Path, Hash Hash, Size Size)[]> _initialStateGameFiles = new();
+
+    /// <summary>
     /// Connection.
     /// </summary>
     protected readonly IConnection Connection;
@@ -211,15 +216,20 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     public Dictionary<GamePath, SyncNode> BuildSyncTree<T>(T latestDiskState, T previousDiskState, Loadout.ReadOnly loadout) where T : IEnumerable<PathPartPair>
     {
         Dictionary<GamePath, SyncNode> syncTree = new();
+        HashSet<GamePath> deletedPaths = [];
 
         foreach (var tuple in WinningFilesQuery(Connection.Db, loadout))
         {
             var itemType = ToItemType(tuple.ItemType);
+            var gamePath = new GamePath(tuple.Location, tuple.Path);
 
             // NOTE(erri120): deleted files are not added to the sync tree
-            if (itemType == LoadoutSourceItemType.Deleted) continue;
+            if (itemType == LoadoutSourceItemType.Deleted)
+            {
+                deletedPaths.Add(gamePath);
+                continue;
+            }
 
-            var gamePath = new GamePath(tuple.Location, tuple.Path);
             if (gamePath == default(GamePath)) throw new Exception($"Item of type `{itemType}` with ID `{tuple.Id}` has no valid game path!");
 
             ref var syncTreeEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(syncTree, gamePath, out var exists);
@@ -254,6 +264,27 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
             {
                 SourceItemType = itemType,
                 Loadout = loadoutPart,
+            };
+        }
+
+        // Game files on the lowest layer: when the file hashes database doesn't know the installed version, the query
+        // has none and the game folder as first indexed stands in for them. Loadout, deleted and intrinsic files win.
+        foreach (var (gamePath, hash, size) in GetInitialStateGameFiles(loadout))
+        {
+            if (deletedPaths.Contains(gamePath)) continue;
+
+            ref var syncTreeEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(syncTree, gamePath, out var exists);
+            if (exists) continue;
+
+            syncTreeEntry = new SyncNode
+            {
+                SourceItemType = LoadoutSourceItemType.Game,
+                Loadout = new SyncNodePart
+                {
+                    Hash = hash,
+                    Size = size,
+                    LastModifiedTicks = 0,
+                },
             };
         }
 
@@ -1458,8 +1489,8 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
 
     public async Task ResetToOriginalGameState(GameInstallation installation, LocatorId[] locatorIds)
     {
-        var gameState = _fileHashService.GetGameFiles((installation.LocatorResult.Store, locatorIds));
         var metadata = await ReindexState(installation);
+        var gameState = GetOriginalGameFiles(metadata, installation.LocatorResult.Store, locatorIds);
 
         var diskStateEntries = DiskStateEntry.FindByGame(metadata.Db, metadata);
 
@@ -1504,6 +1535,43 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
 
         // Run the groupings
         await RunActions(desiredState, installation);
+    }
+
+    /// <summary>
+    /// The original game files: from the file hashes database, or from the game folder as first indexed when the
+    /// database doesn't know the installed version.
+    /// </summary>
+    private IEnumerable<(GamePath Path, Hash Hash, Size Size)> GetOriginalGameFiles(GameInstallMetadata.ReadOnly metadata, GameStore store, LocatorId[] locatorIds)
+    {
+        return _fileHashService.KnowsGameFiles((store, locatorIds))
+            ? _fileHashService.GetGameFiles((store, locatorIds)).Select(file => (file.Path, file.Hash, file.Size))
+            : GetInitialStateGameFiles(metadata);
+    }
+
+    /// <summary>
+    /// The game folder as first indexed when the file hashes database doesn't know the loadout's game version,
+    /// which NMA then uses as the original game files; empty otherwise.
+    /// </summary>
+    private IReadOnlyList<(GamePath Path, Hash Hash, Size Size)> GetInitialStateGameFiles(Loadout.ReadOnly loadout)
+    {
+        var metadata = GameInstallMetadata.Load(Connection.Db, loadout.InstallationId);
+        return _fileHashService.KnowsGameFiles((metadata.Store, loadout.LocatorIds.ToArray())) ? [] : GetInitialStateGameFiles(metadata);
+    }
+
+    private IReadOnlyList<(GamePath Path, Hash Hash, Size Size)> GetInitialStateGameFiles(GameInstallMetadata.ReadOnly metadata)
+    {
+        if (!GameInstallMetadata.InitialDiskStateTransaction.TryGetValue(metadata, out var initialTx)) return [];
+
+        return _initialStateGameFiles.GetOrAdd(initialTx, tx =>
+        {
+            var initialDb = Connection.AsOf(TxId.From(tx.Value));
+            var files = DiskStateEntry.FindByGame(initialDb, metadata.Id)
+                .Select(entry => ((GamePath)entry.Path, entry.Hash, entry.Size))
+                .ToArray();
+
+            Logger.LogInformation("The file hashes database doesn't know the game version installed at `{Path}`: using the {Count} files of the folder as first indexed as the original game files", metadata.Path, files.Length);
+            return files;
+        });
     }
 
     private static VanityVersion? TryReadPrimaryFileVersion(GameInstallation installation)
