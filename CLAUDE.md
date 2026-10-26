@@ -20,8 +20,8 @@ Instructions pour Claude Code (et tout contributeur) travaillant sur ce dépôt.
 
 - AppId `com.nmacommunity.app`, nom affiché `NMA Community Edition`, binaire `NMAcommunity.App`.
 - Application : `src/NexusMods.App/NexusMods.App.csproj`. Solution : `NexusMods.App.sln`.
-- Les projets ciblent `net9.0` (`Directory.Build.props`). `global.json` (`8.0.0`, `rollForward: latestMajor`)
-  prend le SDK le plus récent installé : il en faut un ≥ 9, et un SDK 9 pour les tests (voir « Tests »).
+- Les projets ciblent `net10.0` (`Directory.Build.props`). `global.json` demande un SDK ≥ 10.0.100
+  (`rollForward: latestMajor`) et fait tourner `dotnet test` sur Microsoft.Testing.Platform (voir « Tests »).
 
 ## Build
 
@@ -63,17 +63,22 @@ En cas de « no space left on device », supprime les dossiers `bin/` et `obj/` 
 Même règle que pour le build : sortie dans un fichier, n'afficher que les résumés et les tests en échec.
 
 ```bash
-dotnet test --configuration Release --filter "RequiresNetworking!=True&FlakeyTest!=True" > /tmp/test.log 2>&1
-grep -E "^(Passed|Failed|Skipped)! |^\s+Failed |^\s+(total|failed|succeeded):" /tmp/test.log
+dotnet test --configuration Release --treenode-filter "/**[(RequiresNetworking!=True)&(FlakeyTest!=True)]" \
+  --ignore-exit-code 8 > /tmp/test.log 2>&1
+grep -E "^failed |\) failed|^Handshake failures|^\s+(total|failed|succeeded|skipped|error):" /tmp/test.log
 ```
 
-- Lance les tests avec un SDK 9 : à partir du SDK 10, `dotnet test` refuse les projets TUnit (« Testing
-  with VSTest target is no longer supported… »).
-- Les projets utilisent xunit (une ligne `Passed!`/`Failed!` par projet), sauf `NexusMods.Backend.Tests`
-  et `NexusMods.Sdk.Tests`, en TUnit (lignes `total:`/`failed:`/`succeeded:`).
-- Le filtre exclut les tests marqués `[Trait("RequiresNetworking", "True")]` (réseau, parfois une clé
-  `NEXUS_API_KEY`) ou `[Trait("FlakeyTest", "True")]`. Marque ainsi tout nouveau test qui fait un appel
-  HTTP réel.
+- Les tests tournent sur Microsoft.Testing.Platform : chaque projet `*.Tests` est un exécutable. Les projets
+  xunit 2 passent par `YTest.MTP.XUnit2`, ajouté par `tests/Directory.Build.props`. `NexusMods.Backend.Tests`
+  et `NexusMods.Sdk.Tests` utilisent TUnit, qui a son propre runner, et retirent ce paquet.
+- `--treenode-filter` marche avec xunit et TUnit (`--filter` seulement avec xunit). Il exclut les tests
+  marqués `[Trait("RequiresNetworking", "True")]` (réseau, parfois une clé `NEXUS_API_KEY`) ou
+  `[Trait("FlakeyTest", "True")]` (en TUnit : `[Property(...)]`). Marque ainsi tout nouveau test qui fait
+  un appel HTTP réel. `--ignore-exit-code 8` évite l'échec d'un projet dont le filtre exclut tous les tests.
+- `tests/Directory.Build.targets` lance les tests depuis leur dossier de sortie, comme VSTest : des tests
+  lisent leurs ressources par un chemin relatif.
+- Une bibliothèque d'aide sous `tests/` qui référence xunit doit déclarer `<IsTestProject>false</IsTestProject>`,
+  sinon `dotnet test` la prend pour un projet VSTest et refuse de démarrer.
 - Snapshots (Verify) : en cas d'écart, un `*.received.*` (ignoré par git) apparaît à côté du
   `*.verified.*`. Si le changement est voulu, renomme le `.received` en `.verified`.
 
@@ -81,12 +86,11 @@ grep -E "^(Passed|Failed|Skipped)! |^\s+Failed |^\s+(total|failed|succeeded):" /
 
 La configuration PupNet est dans `src/NexusMods.App/app.pupnet.conf`. Il faut :
 
-- **PupNet 1.9.1**, un outil `net8.0` : sans runtime .NET 8, il refuse de démarrer (« You must install
-  or update .NET »).
+- **PupNet 1.10.0**, un outil `net10.0`.
 - **`appimagetool-x86_64.AppImage` dans le `PATH`**, car PupNet ne l'embarque plus depuis la 1.9.0.
 
 ```bash
-dotnet tool install --global KuiperZone.PupNet --version 1.9.1
+dotnet tool install --global KuiperZone.PupNet --version 1.10.0
 mkdir -p ~/.local/bin   # ~/.local/bin doit être dans le PATH
 curl -fsSL -o ~/.local/bin/appimagetool-x86_64.AppImage \
   https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
@@ -105,11 +109,10 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 - `build-appimage.yml` : à chaque push (toutes branches), à la demande, et appelé par `release.yaml`.
   Publie l'artifact `nma-appimage`.
-- `tests.yml` : à chaque push qui touche au code, avec le filtre ci-dessus. Il épingle le SDK 9 le plus
-  récent du runner via un `global.json` généré.
-- Les deux utilisent les SDK .NET de l'image `ubuntu-latest`, sans `actions/setup-dotnet` (le CDN de
-  Microsoft lui a renvoyé des erreurs 409). Si l'image n'a plus .NET 8 ou 9, une étape de vérification
-  échoue avec un message explicite.
+- `tests.yml` : à chaque push qui touche au code, avec la commande ci-dessus (plus `--timeout 20m`).
+- Les deux utilisent le SDK .NET 10 de l'image `ubuntu-latest`, sans `actions/setup-dotnet` (le CDN de
+  Microsoft lui a renvoyé des erreurs 409). Si l'image n'en a plus, une étape de vérification échoue avec
+  un message explicite.
 
 ## Release
 

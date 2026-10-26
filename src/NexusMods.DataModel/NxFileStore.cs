@@ -226,7 +226,7 @@ public class NxFileStore : IFileStore, IReadOnlyStreamSource
         {
             filesToBackup = await enumerable
                 .ToAsyncEnumerable()
-                .WhereAwait(async x => !(await HaveFile(x.Hash)))
+                .Where(async (ArchivedFileEntry x, CancellationToken _) => !(await HaveFile(x.Hash)))
                 .ToDictionaryAsync(fileToBackUp => fileToBackUp.Hash, fileToBackUp => (fileToBackUp, Stream.Null), cancellationToken: token);
         }
         else

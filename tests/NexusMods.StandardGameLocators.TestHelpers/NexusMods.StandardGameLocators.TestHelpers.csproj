@@ -1,4 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <!-- A helper library, not a test project: xunit.core marks every project referencing xunit as one -->
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\NexusMods.Games.StardewValley\NexusMods.Games.StardewValley.csproj" />
         <ProjectReference Include="..\..\src\NexusMods.DataModel\NexusMods.DataModel.csproj" />

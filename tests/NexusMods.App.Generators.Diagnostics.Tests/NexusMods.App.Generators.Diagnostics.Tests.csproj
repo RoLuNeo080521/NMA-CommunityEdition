@@ -4,6 +4,9 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit"/>
         <PackageReference Include="Verify.Xunit"/>
         <PackageReference Include="Verify.SourceGenerators"/>
+        <!-- Verify.SourceGenerators is built against Roslyn 4.9: the generator's Roslyn 4.8 makes the test app fail to start -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="4.9.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" VersionOverride="4.9.2" />
 
         <PackageReference Remove="Xunit.DependencyInjection" />
         <PackageReference Remove="Xunit.DependencyInjection.Logging" />
