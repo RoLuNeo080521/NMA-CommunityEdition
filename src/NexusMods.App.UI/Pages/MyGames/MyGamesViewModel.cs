@@ -8,6 +8,7 @@ using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using NexusMods.Abstractions.Games;
+using NexusMods.Abstractions.Games.FileHashes;
 using NexusMods.Abstractions.Loadouts;
 using NexusMods.Abstractions.Loadouts.Synchronizers;
 using NexusMods.App.UI.Controls.GameWidget;
@@ -255,7 +256,21 @@ public class MyGamesViewModel : APageViewModel<IMyGamesViewModel>, IMyGamesViewM
 
         vm.State = GameWidgetState.AddingGame;
         var loadout = await Task.Run(async () => await ManageGame(installation));
-        
+
+        // Unknown game version: the folder as it is now stands in for the original game files, so make sure it's clean
+        var fileHashesService = _serviceProvider.GetRequiredService<IFileHashesService>();
+        if (!fileHashesService.KnowsGameFiles((installation.LocatorResult.Store, loadout.LocatorIds.ToArray())))
+        {
+            var (cancel, proceed) = (ButtonDefinitionId.Cancel, ButtonDefinitionId.Accept);
+            if (await ShowUnknownGameVersionDialog(cancel, proceed, installation) != proceed)
+            {
+                vm.State = GameWidgetState.RemovingGame;
+                await Task.Run(async () => await _syncService.UnManage(installation, cleanGameFolder: false));
+                vm.State = GameWidgetState.DetectedGame;
+                return;
+            }
+        }
+
         // Check if there are external changes
         var changeEntries = await GetExternalChangesItems(loadout);
         vm.State = GameWidgetState.ManagedGame;
@@ -340,7 +355,36 @@ public class MyGamesViewModel : APageViewModel<IMyGamesViewModel>, IMyGamesViewM
         
         return (await _windowManager.ShowDialog(dialog, DialogWindowType.Modal)).ButtonId;
     }
-    
+
+    private async Task<ButtonDefinitionId> ShowUnknownGameVersionDialog(
+        ButtonDefinitionId cancel,
+        ButtonDefinitionId proceed,
+        GameInstallation installation)
+    {
+        var markdownVm = _serviceProvider.GetRequiredService<IMarkdownRendererViewModel>();
+        markdownVm.Contents = $"""
+            The game file database doesn't know this version of {installation.Game.DisplayName}, so the app can't tell its original files from mods.
+            #### The files in the game folder now will be treated as the original game files
+            - If you installed mods by hand, **remove them** or verify the game files in your launcher before continuing.
+            - If you stop managing this game, its folder goes back to this state.
+            """;
+
+        var dialog = DialogFactory.CreateStandardDialog(
+            title: $"Unknown {installation.Game.DisplayName} version",
+            new StandardDialogParameters()
+            {
+                Markdown = markdownVm,
+            },
+            buttonDefinitions:
+            [
+                new DialogButtonDefinition("Cancel", cancel),
+                new DialogButtonDefinition("Continue", proceed, ButtonAction.Accept, ButtonStyling.Primary),
+            ]
+        );
+
+        return (await _windowManager.ShowDialog(dialog, DialogWindowType.Modal)).ButtonId;
+    }
+
     private async Task CleanGameFolder(GameInstallation installation, Loadout.ReadOnly loadout)
     {
         var db = _connection.Db;
