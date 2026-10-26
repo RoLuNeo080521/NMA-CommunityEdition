@@ -45,7 +45,7 @@ public class PluginsFile : IIntrinsicFile
             .Where(p => p.Key.Parent == KnownPaths.Data && KnownCEExtensions.PluginFiles.Contains(p.Key.Extension))
             .Where(p => p.Value.HaveLoadout)
             .ToAsyncEnumerable()
-            .SelectAwait(MakeMetadata)
+            .Select((KeyValuePair<GamePath, SyncNode> plugin, CancellationToken _) => MakeMetadata(plugin))
             .Where(m => m.HasValue)
             .Select(m => m!.Value)
             .ToDictionaryAsync(x => x.ModKey);

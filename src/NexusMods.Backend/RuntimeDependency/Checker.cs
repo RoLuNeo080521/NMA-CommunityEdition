@@ -16,13 +16,15 @@ internal class RuntimeDependencyChecker : BackgroundService
         _runtimeDependencies = serviceProvider.GetServices<IRuntimeDependency>().ToArray();
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return _runtimeDependencies.ToAsyncEnumerable().ForEachAwaitWithCancellationAsync(async (dep, cancellationToken) =>
+        foreach (var dep in _runtimeDependencies)
         {
+            stoppingToken.ThrowIfCancellationRequested();
+
             try
             {
-                var information = await dep.QueryInstallationInformation(cancellationToken).ConfigureAwait(false);
+                var information = await dep.QueryInstallationInformation(stoppingToken).ConfigureAwait(false);
                 if (information.HasValue)
                 {
                     _logger.LogInformation("{Name}: {Information}", dep.DisplayName, information.Value);
@@ -32,6 +34,6 @@ internal class RuntimeDependencyChecker : BackgroundService
             } catch (Exception e) {
                 _logger.LogError(e, "{Name}: exception while querying information", dep.DisplayName);
             }
-        }, cancellationToken: stoppingToken);
+        }
     }
 }

@@ -47,14 +47,10 @@ jobs:
 
       # The runner image ships the .NET SDKs: no download from Microsoft's CDN, which can be down
       # (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
-      # It also ships a newer SDK, which global.json (rollForward: latestMajor) would select. From .NET 10 on,
-      # `dotnet test` refuses to run the TUnit projects in VSTest mode, so pin this job to the newest SDK 9.
-      - name: Use the .NET 9 SDK
+      - name: Check .NET 10
         run: |
           dotnet --list-sdks
-          sdk=$(dotnet --list-sdks | awk '/^9\./ { print $1 }' | sort -V | tail -1)
-          if [[ -z "$sdk" ]]; then echo "::error::No .NET 9 SDK on the runner image"; exit 1; fi
-          dotnet new globaljson --sdk-version "$sdk" --force
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::No .NET 10 SDK on the runner image"; exit 1; }
           dotnet --version
 
       - name: Build
@@ -63,8 +59,10 @@ jobs:
       - name: Disk space (after build)
         run: df -h
 
+      # global.json runs the tests on Microsoft.Testing.Platform. The tree-node filter works with both xunit and TUnit;
+      # exit code 8 means that the filter left no test in a project.
       - name: Test
-        run: dotnet test --configuration Release --no-build --filter "RequiresNetworking!=True&FlakeyTest!=True" --blame-hang-timeout 20m
+        run: dotnet test --configuration Release --no-build --treenode-filter "/**[(RequiresNetworking!=True)&(FlakeyTest!=True)]" --ignore-exit-code 8 --timeout 20m
 
       - name: Disk space (end)
         if: always()

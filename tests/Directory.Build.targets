@@ -1,0 +1,7 @@
+<Project>
+    <!-- dotnet test starts each test app in RunWorkingDirectory. Use the output directory, as VSTest did:
+         tests read their resources through paths relative to the current directory. -->
+    <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+        <RunWorkingDirectory Condition="'$(RunWorkingDirectory)' == ''">$(OutDir)</RunWorkingDirectory>
+    </PropertyGroup>
+</Project>

@@ -64,7 +64,7 @@ cd NMA-CommunityEdition
 dotnet build
 ```
 
-You'll need the .NET 9 SDK installed, and network access to `data.nexusmods.com` during the build. In an existing clone, fetch the submodules with `git submodule update --init --recursive`: the build fails without them.
+You'll need the .NET 10 SDK installed, and network access to `data.nexusmods.com` during the build. In an existing clone, fetch the submodules with `git submodule update --init --recursive`: the build fails without them.
 
 ## Credits
 

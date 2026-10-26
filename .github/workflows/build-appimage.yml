@@ -30,7 +30,7 @@ permissions:
 
 env:
   ProjectDir: "src/NexusMods.App"
-  PupNetVersion: "1.9.1"
+  PupNetVersion: "1.10.0"
   AppImageToolVersion: "1.9.1"
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
@@ -55,14 +55,12 @@ jobs:
       - name: Disk space (start)
         run: df -h
 
-      # .NET 9 builds the app (net9.0); PupNet 1.9.1 is a net8.0 tool and needs the .NET 8 runtime,
-      # which comes with the 8.0 SDK. Both ship with the runner image: no download from Microsoft's CDN,
-      # which can be down (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
-      - name: Check .NET 8 and 9
+      # The .NET 10 SDK builds the app (net10.0) and runs PupNet, a net10.0 tool. It ships with the runner image:
+      # no download from Microsoft's CDN, which can be down (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
+      - name: Check .NET 10
         run: |
           dotnet --list-sdks
-          dotnet --list-sdks | grep -q '^9\.' || { echo "::error::No .NET 9 SDK on the runner image"; exit 1; }
-          dotnet --list-runtimes | grep -q '^Microsoft\.NETCore\.App 8\.' || { echo "::error::No .NET 8 runtime on the runner image"; exit 1; }
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::No .NET 10 SDK on the runner image"; exit 1; }
 
       - name: Print debug info
         run: dotnet --info

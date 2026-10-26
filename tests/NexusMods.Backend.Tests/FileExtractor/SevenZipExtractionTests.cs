@@ -87,7 +87,7 @@ public class SevenZipExtractionTests : AFileExtractorTest
 
         var actual = await tempFolder.Path.EnumerateFiles()
             .ToAsyncEnumerable()
-            .SelectAwait(async f => (f.RelativeTo(dest), await f.XxHash3Async()))
+            .Select(async (AbsolutePath f, CancellationToken _) => (f.RelativeTo(dest), await f.XxHash3Async()))
             .ToArrayAsync();
 
         (RelativePath, Hash)[] expected = [

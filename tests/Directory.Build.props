@@ -5,6 +5,11 @@
         <IsPackable>false</IsPackable>
     </PropertyGroup>
 
+    <!-- Test projects run on Microsoft.Testing.Platform (see global.json), which needs executables. -->
+    <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="NSubstitute" />
         <PackageReference Include="NSubstitute.Analyzers.CSharp"/>
@@ -23,16 +28,15 @@
 
     <ItemGroup>
         <PackageReference Include="xunit" />
-        <PackageReference Include="xunit.runner.visualstudio" />
         <PackageReference Include="Xunit.SkippableFact" />
         <PackageReference Include="Xunit.DependencyInjection" />
         <PackageReference Include="Xunit.DependencyInjection.Logging" />
         <PackageReference Include="Xunit.DependencyInjection.SkippableFact" />
     </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="coverlet.collector" />
-        <PackageReference Include="GitHubActionsTestLogger" />
+    <!-- Runs the xunit 2 tests on Microsoft.Testing.Platform. The TUnit projects remove it, TUnit has its own runner.
+         PrivateAssets: a project referencing a test project (the benchmarks) must not become a test app. -->
+    <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+        <PackageReference Include="YTest.MTP.XUnit2" PrivateAssets="all" />
     </ItemGroup>
 </Project>
