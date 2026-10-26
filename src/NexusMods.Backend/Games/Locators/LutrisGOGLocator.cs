@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using NexusMods.Paths;
 using NexusMods.Sdk.Games;
@@ -9,9 +10,8 @@ namespace NexusMods.Backend.Games.Locators;
 
 /// <summary>
 /// Detects GOG games installed via Lutris (Linux) by parsing the per-game
-/// YAML files under ~/.config/lutris/games/. Each file carries the GOG
-/// product id (service_id), slug, and exe path — enough to emit the same
-/// GameLocatorResult shape Heroic uses.
+/// YAML files in Lutris' games config folder. Each file carries the GOG
+/// product id (service_id), the Lutris game slug, and the exe path.
 /// </summary>
 internal class LutrisGOGLocator : IGameLocator
 {
@@ -33,24 +33,51 @@ internal class LutrisGOGLocator : IGameLocator
 
     public IEnumerable<GameLocatorResult> Locate()
     {
-        var configDir = _fileSystem.GetKnownPath(KnownPath.XDG_CONFIG_HOME).Combine("lutris/games");
-        if (!configDir.DirectoryExists()) yield break;
+        var foundPaths = new HashSet<AbsolutePath>();
 
-        foreach (var yamlFile in configDir.EnumerateFiles("*.yml"))
+        foreach (var configDir in GetGameConfigDirectories())
         {
-            GameLocatorResult? result;
-            try
+            foreach (var yamlFile in configDir.EnumerateFiles("*.yml", recursive: false))
             {
-                result = TryParse(yamlFile);
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "Failed to parse Lutris game config {Path}", yamlFile);
-                continue;
-            }
+                GameLocatorResult? result;
+                try
+                {
+                    result = TryParse(yamlFile);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "Failed to parse Lutris game config {Path}", yamlFile);
+                    continue;
+                }
 
-            if (result is not null)
-                yield return result;
+                // The same game can show up in both the native and the Flatpak Lutris
+                if (result is not null && foundPaths.Add(result.Path))
+                    yield return result;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Lutris reads its config from ~/.config/lutris when that folder exists, and from ~/.local/share/lutris
+    /// otherwise (lutris/settings.py: ~/.config/lutris is deprecated, new installs never create it).
+    /// The Flatpak build uses the same layout under ~/.var/app/net.lutris.Lutris.
+    /// </summary>
+    internal IEnumerable<AbsolutePath> GetGameConfigDirectories()
+    {
+        var flatpakDir = _fileSystem.GetKnownPath(KnownPath.HomeDirectory).Combine(".var/app/net.lutris.Lutris");
+        (AbsolutePath ConfigHome, AbsolutePath DataHome)[] installs =
+        [
+            (_fileSystem.GetKnownPath(KnownPath.XDG_CONFIG_HOME), _fileSystem.GetKnownPath(KnownPath.XDG_DATA_HOME)),
+            (flatpakDir.Combine("config"), flatpakDir.Combine("data")),
+        ];
+
+        foreach (var (configHome, dataHome) in installs)
+        {
+            var lutrisDir = configHome.Combine("lutris");
+            if (!lutrisDir.DirectoryExists()) lutrisDir = dataHome.Combine("lutris");
+
+            var gamesDir = lutrisDir.Combine("games");
+            if (gamesDir.DirectoryExists()) yield return gamesDir;
         }
     }
 
@@ -70,7 +97,11 @@ internal class LutrisGOGLocator : IGameLocator
         if (string.IsNullOrWhiteSpace(serviceIdStr) || !long.TryParse(serviceIdStr, out var productId))
             return null;
 
-        if (!_registeredGames.TryGetValue(productId, out var game)) return null;
+        if (!_registeredGames.TryGetValue(productId, out var game))
+        {
+            _logger.LogDebug("Ignoring Lutris GOG game '{Name}' with product id {ProductId}: not a supported game", GetScalar(root, "name"), productId);
+            return null;
+        }
 
         if (root.Children.TryGetValue(new YamlScalarNode("game"), out var gameNode) is false ||
             gameNode is not YamlMappingNode gameMap) return null;
@@ -78,39 +109,95 @@ internal class LutrisGOGLocator : IGameLocator
         var exePath = GetScalar(gameMap, "exe");
         if (string.IsNullOrWhiteSpace(exePath)) return null;
 
-        // Trust the Lutris config as the source of truth for installed games —
-        // same as HeroicGOGLocator, which never probes the filesystem itself.
-        // An existence check here is a false-negative waiting to happen:
-        // transient read failures (filesystem indexer, Lutris holding a lock
-        // on the prefix, sandboxed access on some setups) would silently drop
-        // the game from the locator and surface as "Found no installation of
-        // the game `GOG`/`<Game>` anymore!" on the next sync.
+        // Lutris expands `~` itself, and resolves a relative exe against the game folder stored in its database
+        if (exePath.StartsWith("~/", StringComparison.Ordinal))
+            exePath = _fileSystem.GetKnownPath(KnownPath.HomeDirectory).Combine(exePath[2..]).ToString();
+        if (!exePath.StartsWith('/'))
+        {
+            _logger.LogWarning("Ignoring Lutris game config {Path}: its exe path `{Exe}` is relative", yamlFile, exePath);
+            return null;
+        }
+
+        // Trust the Lutris config as the source of truth for installed games, like HeroicGOGLocator:
+        // the game isn't dropped when its files can't be read right now. The goggame file only refines the result.
         var exe = _fileSystem.FromUnsanitizedFullPath(exePath);
-        var gameFolder = exe.Parent;
+        var gameFolder = FindGameRoot(exe, productId);
+        if (gameFolder is null)
+            _logger.LogDebug("No goggame-{ProductId}.info above {Exe}, using the exe folder as the game folder", productId, exe);
 
-        // Extract the Lutris internal id from the yml filename pattern
-        // "<slug>-<id>.yml" — it's a stable integer we can hand back to Lutris
-        // via `lutris:rungameid/<id>` and that satisfies the UBIGINT cast the
-        // file-hashes SQL applies to every GOG LocatorId. Fallback to the GOG
-        // product id if the pattern doesn't match.
-        var fileName = yamlFile.FileName.ToString();
-        var baseName = fileName.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ? fileName[..^4] : fileName;
-        var dashIdx = baseName.LastIndexOf('-');
-        long lutrisGameId = productId;
-        if (dashIdx >= 0 && long.TryParse(baseName.AsSpan(dashIdx + 1), out var parsed))
-            lutrisGameId = parsed;
+        var path = gameFolder ?? exe.Parent;
+        var buildId = gameFolder is null ? null : ReadBuildId(gameFolder.Value.Combine($"goggame-{productId}.info"));
 
-        _logger.LogDebug("Found Lutris GOG game '{Name}' productId={ProductId} lutrisId={LutrisId} at {Path}", GetScalar(root, "name"), productId, lutrisGameId, gameFolder);
+        // Same locator ids as GOGLocator: the build id, which the file hashes are indexed by, then the installed DLCs
+        ImmutableArray<LocatorId> locatorIds =
+        [
+            LocatorId.From(buildId ?? productId.ToString()),
+            ..FindInstalledDlcs(gameFolder, productId).Select(dlcId => LocatorId.From(dlcId.ToString())),
+        ];
+
+        // Lutris runs a game from its library slug: `lutris:rungame/<game_slug>`
+        var gameSlug = GetScalar(root, "game_slug");
+
+        _logger.LogDebug("Found Lutris GOG game '{Name}' productId={ProductId} slug={Slug} at {Path}", GetScalar(root, "name"), productId, gameSlug, path);
 
         return new GameLocatorResult
         {
             Game = game,
-            Path = gameFolder,
-            LocatorIds = ImmutableArray.Create(LocatorId.From(lutrisGameId.ToString())),
+            Path = path,
+            LocatorIds = locatorIds,
             StoreIdentifier = productId.ToString(),
             Store = Store,
             Locator = this,
+            LauncherGameId = string.IsNullOrWhiteSpace(gameSlug) ? null : gameSlug,
         };
+    }
+
+    /// <summary>
+    /// GOG installs have a goggame-&lt;productId&gt;.info file at their root, while the exe can be deeper
+    /// (Cyberpunk 2077: bin/x64/Cyberpunk2077.exe). Returns the folder of that file, if any.
+    /// </summary>
+    private static AbsolutePath? FindGameRoot(AbsolutePath exe, long productId)
+    {
+        var infoFileName = $"goggame-{productId}.info";
+        for (var directory = exe.Parent; ; directory = directory.Parent)
+        {
+            if (directory.Combine(infoFileName).FileExists) return directory;
+            if (directory == directory.GetRootDirectory()) return null;
+        }
+    }
+
+    private string? ReadBuildId(AbsolutePath infoFile)
+    {
+        try
+        {
+            using var stream = infoFile.Read();
+            using var json = JsonDocument.Parse(stream);
+            if (json.RootElement.TryGetProperty("buildId", out var buildId) &&
+                buildId.ValueKind == JsonValueKind.String &&
+                ulong.TryParse(buildId.GetString(), out _))
+                return buildId.GetString();
+        }
+        catch (Exception e)
+        {
+            _logger.LogDebug(e, "Failed to read the build id from {Path}", infoFile);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Each installed DLC adds its own goggame-&lt;productId&gt;.info next to the game's one.
+    /// </summary>
+    private static IEnumerable<long> FindInstalledDlcs(AbsolutePath? gameFolder, long productId)
+    {
+        if (gameFolder is null) yield break;
+
+        foreach (var file in gameFolder.Value.EnumerateFiles("goggame-*.info", recursive: false))
+        {
+            var name = file.FileName.ToString();
+            if (long.TryParse(name.AsSpan("goggame-".Length, name.Length - "goggame-".Length - ".info".Length), out var id) && id != productId)
+                yield return id;
+        }
     }
 
     private static string? GetScalar(YamlMappingNode node, string key)

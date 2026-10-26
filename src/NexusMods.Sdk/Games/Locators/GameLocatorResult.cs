@@ -34,6 +34,12 @@ public class GameLocatorResult
     public required ImmutableArray<LocatorId> LocatorIds { get; init; }
 
     /// <summary>
+    /// The identifier the launcher that installed the game uses to run it, when it isn't
+    /// <see cref="StoreIdentifier"/> (e.g. the Lutris game slug of a GOG game installed with Lutris).
+    /// </summary>
+    public string? LauncherGameId { get; init; }
+
+    /// <summary>
     /// The locator that found this instance.
     /// </summary>
     public required IGameLocator Locator { get; init; }
