@@ -7,7 +7,7 @@
 
 ## Introduction
 
-The official [Nexus Mods App](https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq) was paused by Nexus Mods / Black Tree Gaming Ltd. to refocus on Vortex. **NMA Community Edition** picks up where they left off, with a focus on the **Linux ecosystem** (Steam, GOG via Heroic, Wine prefixes, etc.) — a use case the upstream app supported well but no longer maintains.
+The official [Nexus Mods App](https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq) was paused by Nexus Mods / Black Tree Gaming Ltd. to refocus on Vortex. **NMA Community Edition** picks up where they left off, with a focus on the **Linux ecosystem** (Steam, GOG via Heroic or Lutris, Wine prefixes, etc.) — a use case the upstream app supported well but no longer maintains.
 
 This is an **unofficial fork**, not affiliated with, endorsed by, or supported by Nexus Mods. All credit for the original application goes to the upstream team and contributors.
 
@@ -25,7 +25,7 @@ This is an **unofficial fork**, not affiliated with, endorsed by, or supported b
 ### Supported stores
 
 - **Steam** (native + Proton)
-- **GOG** (native + via Heroic Games Launcher)
+- **GOG** (native, via Heroic Games Launcher or Lutris)
 - **Epic Games Store** (where applicable per game)
 - **Microsoft Store / Xbox Game Pass** (where applicable per game)
 
@@ -40,7 +40,7 @@ This is an **unofficial fork**, not affiliated with, endorsed by, or supported b
 The fork follows community demand rather than a rigid roadmap. Likely directions:
 
 - **More games**: porting / completing support for popular Nexus Mods titles (Starfield, Fallout: New Vegas, Oblivion, etc.) as time and testing allow.
-- **More Linux launchers**: better integration with Lutris, Bottles and other Wine front-ends.
+- **More Linux launchers**: Bottles and other Wine front-ends, and Lutris beyond GOG games.
 - **Continued bug fixes**: real-world issues reported on the [issues page](../../issues) drive priorities.
 
 If you want to suggest something or contribute, open an issue or pull request.
@@ -59,12 +59,12 @@ Detailed changes for each version are in the release notes, not duplicated here.
 ## Building from source
 
 ```bash
-git clone https://github.com/RoLuNeo080521/NMA-CommunityEdition.git
+git clone --recurse-submodules https://github.com/RoLuNeo080521/NMA-CommunityEdition.git
 cd NMA-CommunityEdition
 dotnet build
 ```
 
-You'll need the .NET 9 SDK installed.
+You'll need the .NET 9 SDK installed, and network access to `data.nexusmods.com` during the build. In an existing clone, fetch the submodules with `git submodule update --init --recursive`: the build fails without them.
 
 ## Credits
 
@@ -72,4 +72,4 @@ All credit for the original application goes to the **Nexus Mods team** and the 
 
 ## License
 
-GPL-3.0-only, as inherited from the upstream project. All original copyright notices are preserved. Full license text in [`LICENSE`](./LICENSE).
+GPL-3.0-only, as inherited from the upstream project. All original copyright notices are preserved. Full license text in [`LICENSE.md`](./LICENSE.md).

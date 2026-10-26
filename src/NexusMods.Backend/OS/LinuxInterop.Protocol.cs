@@ -12,7 +12,6 @@ internal partial class LinuxInterop
     private const string DesktopFile = $"{ApplicationId}.desktop";
     private const string DesktopFileResourceName = $"NexusMods.Backend.{DesktopFile}";
     private const string ExecuteParameterPlaceholder = "${INSTALL_EXEC}";
-    private const string TryExecuteParameterPlaceholder = "${INSTALL_TRYEXEC}";
 
     public async ValueTask RegisterUriSchemeHandler(string scheme, bool setAsDefaultHandler, CancellationToken cancellationToken)
     {
@@ -105,7 +104,10 @@ internal partial class LinuxInterop
         var wrapperScriptPath = await CreateWrapperScriptIfNeeded(applicationsDirectory, processPath, cancellationToken);
 
         text = text.Replace(ExecuteParameterPlaceholder, wrapperScriptPath);
-        text = text.Replace(TryExecuteParameterPlaceholder, EscapeDesktopFilePath(processPath));
+
+        // PupNet has no TryExec macro, so the template has no TryExec line, which would stay unexpanded in the AppImage.
+        // Add it here: the desktop entry then disappears if the executable is moved or deleted.
+        text = $"{text.TrimEnd()}\nTryExec={EscapeDesktopFilePath(processPath)}\n";
         
         await filePath.WriteAllTextAsync(text, cancellationToken);
     }

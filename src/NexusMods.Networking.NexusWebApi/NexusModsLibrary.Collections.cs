@@ -195,8 +195,8 @@ public partial class NexusModsLibrary
         var result = await _graphQlClient.AddRequiredCollectionMetadata(
             collectionId: collection.CollectionId,
             category: optionalDefaultCategory.Value,
-            summary: "Created with the Nexus Mods app.",
-            description: $"Created with the Nexus Mods app v{ApplicationConstants.Version.ToSafeString(maxFieldCount: 3)}.",
+            summary: "Created with NMA Community Edition.",
+            description: $"Created with NMA Community Edition v{ApplicationConstants.Version.ToSafeString(maxFieldCount: 3)}.",
             cancellationToken: cancellationToken
         );
 
@@ -782,7 +782,7 @@ public partial class NexusModsLibrary
         if (added.Length == 0 && removed.Length == 0) return null;
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Auto-generated changelog created by the Nexus Mods app {ApplicationConstants.Version.ToSafeString(maxFieldCount: 3)}");
+        sb.AppendLine($"Auto-generated changelog created by NMA Community Edition {ApplicationConstants.Version.ToSafeString(maxFieldCount: 3)}");
 
         if (added.Length > 0)
         {

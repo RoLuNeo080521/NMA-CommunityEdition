@@ -11,7 +11,6 @@ StartupWMClass=NMAcommunity.App
 MimeType=x-scheme-handler/nxm
 Icon=com.nmacommunity.app
 Exec=${INSTALL_EXEC} %u
-TryExec=${INSTALL_TRYEXEC}
 X-AppImage-Integrate=true
 X-AppImage-Name=NMAcommunity.App
 X-AppImage-Arch=x86_64

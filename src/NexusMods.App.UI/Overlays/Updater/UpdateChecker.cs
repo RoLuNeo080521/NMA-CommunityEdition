@@ -11,7 +11,7 @@ namespace NexusMods.App.UI.Overlays.Updater;
 public class UpdateChecker
 {
     private const string GitHubOrganization = "RoLuNeo080521";
-    private const string GitHubRepository = "NexusMods.App";
+    private const string GitHubRepository = "NMA-CommunityEdition";
 
     private readonly ILogger _logger;
     private readonly IGitHubApi _gitHubApi;
