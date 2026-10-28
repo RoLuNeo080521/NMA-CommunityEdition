@@ -109,10 +109,18 @@ public class RunGameTool<T> : IRunGameTool
             if (locatorResult.Store == GameStore.EGS)
             {
                 // Heroic's Epic runner is "legendary"
-                // (https://heroicgameslauncher.com/docs/integrations/legendary).
+                // (https://heroicgameslauncher.com/docs/integrations/legendary). It runs a game by its Legendary
+                // app name, which the Heroic locator reports as LauncherGameId. Epic games found in a Wine prefix
+                // have none, and Heroic doesn't know them.
+                if (locatorResult.LauncherGameId is null)
+                {
+                    _logger.LogWarning("Can't launch the game: on Linux, only the Epic games installed with Heroic can be launched. Start it from the Epic Games Launcher");
+                    return;
+                }
+
                 if (!program.Equals(primaryFile))
                     _logger.LogInformation("Delegating launch to Heroic (Linux). Configure `{Program}` in Heroic launch options if needed.", program.FileName);
-                await RunThroughHeroic("legendary", locatorResult.StoreIdentifier, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
+                await RunThroughHeroic("legendary", locatorResult.LauncherGameId, cancellationToken, commandLineArgs, BuildProcessNameSet(program, primaryFile));
                 return;
             }
         }
