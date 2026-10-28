@@ -23,6 +23,12 @@ public class SortOrderManager : ISortOrderManager, IDisposable
     private IDisposable? _subscription;
     private readonly ILogger<SortOrderManager> _logger;
     
+    // The change handlers that are running, plus one until Dispose. The connection is disposed after this manager,
+    // so Dispose waits for them: a handler still reading the closed database would crash the process in RocksDB.
+    private readonly CountdownEvent _runningHandlers = new(initialCount: 1);
+    private static readonly TimeSpan DisposeTimeout = TimeSpan.FromSeconds(5);
+    private int _isDisposed;
+
     private FrozenDictionary<SortOrderVarietyId, ISortOrderVariety> _sortOrderVarieties;
 
     public SortOrderManager(IServiceProvider serviceProvider)
@@ -109,6 +115,9 @@ public class SortOrderManager : ISortOrderManager, IDisposable
             .ToObservable()
             .SubscribeAwait(this, static async (changes, state, token) =>
                 {
+                    using var running = state.TryEnterHandler();
+                    if (running is null) return;
+
                     foreach (var change in changes)
                     {
                         var loadoutId = change.Current.LoadoutId;
@@ -130,7 +139,10 @@ public class SortOrderManager : ISortOrderManager, IDisposable
                                 break;
                         }
                     }
-                }
+                },
+                // Run on the thread pool rather than the subscriber's context (UI thread, test runner): Dispose waits
+                // for the handlers and could be blocking that context
+                configureAwait: false
             )
             .AddTo(compositeDisposable);
         
@@ -142,6 +154,9 @@ public class SortOrderManager : ISortOrderManager, IDisposable
             .ToObservable()
             .SubscribeAwait(this, static async (changes, state, token) =>
                 {
+                    using var running = state.TryEnterHandler();
+                    if (running is null) return;
+
                     foreach (var change in changes)
                     {
                         var collectionGroupId = change.Current.CollectionGroupId;
@@ -164,7 +179,8 @@ public class SortOrderManager : ISortOrderManager, IDisposable
                                 break;
                         }
                     }
-                }
+                },
+                configureAwait: false
             )
             .AddTo(compositeDisposable);
         
@@ -176,6 +192,9 @@ public class SortOrderManager : ISortOrderManager, IDisposable
             .ToObservable()
             .SubscribeAwait(this, static async (changes, state, token) =>
             {
+                using var running = state.TryEnterHandler();
+                if (running is null) return;
+
                 // Filter out updates where nothing changed
                 var filteredChanges = changes
                     .Where(change => change.Reason != ChangeReason.Update)
@@ -208,15 +227,33 @@ public class SortOrderManager : ISortOrderManager, IDisposable
                 {
                     await state.UpdateLoadOrders(pair.Value, Optional.Some(pair.Key), token: token);
                 }
-            })
+            }, configureAwait: false)
             .AddTo(compositeDisposable);
         
         _subscription = compositeDisposable;
     }
 
+    private HandlerScope? TryEnterHandler()
+    {
+        // Fails once Dispose ran and no handler is left
+        return _runningHandlers.TryAddCount() ? new HandlerScope(_runningHandlers) : null;
+    }
+
+    private sealed class HandlerScope(CountdownEvent runningHandlers) : IDisposable
+    {
+        public void Dispose() => runningHandlers.Signal();
+    }
+
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _isDisposed, 1) == 1) return;
+
+        // Cancels the token of the running handlers, but doesn't wait for them
         _subscription?.Dispose();
+
+        _runningHandlers.Signal();
+        if (!_runningHandlers.Wait(DisposeTimeout))
+            _logger.LogWarning("Sort order updates still running after {Timeout}, disposing anyway", DisposeTimeout);
     }
 }
 
