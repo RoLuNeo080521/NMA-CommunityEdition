@@ -55,12 +55,20 @@ jobs:
       - name: Disk space (start)
         run: df -h
 
-      # The .NET 10 SDK builds the app (net10.0) and runs PupNet, a net10.0 tool. It ships with the runner image:
-      # no download from Microsoft's CDN, which can be down (actions/setup-dotnet failed there with HTTP 409 on 2026-10-25).
+      # The AppImage embeds the newest .NET runtime the building SDK knows, and the runner image's SDK can be a few
+      # patches behind: install the latest .NET 10 SDK. Microsoft's CDN can be down (HTTP 409 on 2026-10-25), so keep
+      # building with the runner's SDK if this fails.
+      - name: Install the latest .NET 10 SDK
+        uses: actions/setup-dotnet@v5
+        continue-on-error: true
+        with:
+          dotnet-version: "10.0.x"
+
+      # The .NET 10 SDK builds the app (net10.0) and runs PupNet, a net10.0 tool.
       - name: Check .NET 10
         run: |
           dotnet --list-sdks
-          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::No .NET 10 SDK on the runner image"; exit 1; }
+          dotnet --list-sdks | grep -q '^10\.' || { echo "::error::No .NET 10 SDK installed"; exit 1; }
 
       - name: Print debug info
         run: dotnet --info
