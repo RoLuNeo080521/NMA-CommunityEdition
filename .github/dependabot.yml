@@ -6,9 +6,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-      timezone: "Europe/London"
-    reviewers:
-      - "Nexus-Mods/nexusmods-app-developers"
+      timezone: "Europe/Paris"
     labels:
       - "area-dependencies"
     allow:
@@ -36,3 +34,16 @@ updates:
       GameFinder:
         patterns:
           - "GameFinder*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    labels:
+      - "area-dependencies"
+    groups:
+      GitHubActions:
+        patterns:
+          - "*"
