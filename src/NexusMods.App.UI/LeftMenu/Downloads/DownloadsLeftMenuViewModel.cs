@@ -60,7 +60,7 @@ public class DownloadsLeftMenuViewModel : AViewModel<IDownloadsLeftMenuViewModel
         this.WhenActivated(disposable =>
         {
             Sdk.Loadouts.Loadout.ObserveAll(connection)
-                .Filter(loadout => loadout.IsVisible())
+                .Filter(loadout => loadout.IsVisible() && loadout.IsGameDetected())
                 .Group(loadout => loadout.InstallationId)
                 .Transform(group => group.Cache.Items.First().InstallationInstance)
                 .Transform(gameInstallation => CreatePerGameDownloadItem(gameInstallation, workspaceController, workspaceId, logger))

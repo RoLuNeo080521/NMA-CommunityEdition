@@ -161,7 +161,7 @@ public class MyGamesViewModel : APageViewModel<IMyGamesViewModel>, IMyGamesViewM
                             });
 
                             vm.IsManagedObservable = Loadout.ObserveAll(conn)
-                                .Filter(l => l.IsVisible() && l.InstallationInstance.Game.GameId == installation.Game.GameId && l.InstallationInstance.LocatorResult.Store == installation.LocatorResult.Store)
+                                .Filter(l => l.IsVisible() && l.IsGameDetected() && l.InstallationInstance.Game.GameId == installation.Game.GameId && l.InstallationInstance.LocatorResult.Store == installation.LocatorResult.Store)
                                 .Count()
                                 .Select(c => c > 0);
 
@@ -420,7 +420,7 @@ public class MyGamesViewModel : APageViewModel<IMyGamesViewModel>, IMyGamesViewM
         }
 
         // no applied loadout, return the first one
-        var loadout = Loadout.All(conn.Db).FirstOrOptional(loadout => loadout.IsVisible() && loadout.InstallationInstance.Equals(installation));
+        var loadout = Loadout.All(conn.Db).FirstOrOptional(loadout => loadout.IsVisible() && loadout.IsGameDetected() && loadout.InstallationInstance.Equals(installation));
         return loadout.HasValue ? loadout.Value.LoadoutId : Optional<LoadoutId>.None;
     }
     

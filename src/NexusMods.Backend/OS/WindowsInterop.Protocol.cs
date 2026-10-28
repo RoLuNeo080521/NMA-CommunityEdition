@@ -74,6 +74,6 @@ internal partial class WindowsInterop
     [SupportedOSPlatform("windows")]
     private void SetAsDefaultHandler(string uriScheme)
     {
-        CreateProgIdClass(uriScheme, $"Nexus Mods App {uriScheme.ToUpperInvariant()} Handler", isProtocolHandler: true);
+        CreateProgIdClass(uriScheme, $"NMA Community Edition {uriScheme.ToUpperInvariant()} Handler", isProtocolHandler: true);
     }
 }

@@ -110,9 +110,10 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 - `build-appimage.yml` : à chaque push (toutes branches), à la demande, et appelé par `release.yaml`.
   Publie l'artifact `nma-appimage`.
 - `tests.yml` : à chaque push qui touche au code, avec la commande ci-dessus (plus `--timeout 20m`).
-- Les deux utilisent le SDK .NET 10 de l'image `ubuntu-latest`, sans `actions/setup-dotnet` (le CDN de
-  Microsoft lui a renvoyé des erreurs 409). Si l'image n'en a plus, une étape de vérification échoue avec
-  un message explicite.
+- `tests.yml` utilise le SDK .NET 10 de l'image `ubuntu-latest`. `build-appimage.yml` installe d'abord le
+  dernier SDK 10 avec `actions/setup-dotnet` : l'AppImage embarque le runtime que connaît ce SDK, et celui de
+  l'image a souvent quelques correctifs de retard. Si le CDN de Microsoft échoue (erreurs 409 déjà vues), il
+  garde celui de l'image. Sans aucun SDK 10, une étape de vérification échoue avec un message explicite.
 
 ## Release
 
