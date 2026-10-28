@@ -348,7 +348,7 @@ public class Program
         var config = new NLog.Config.LoggingConfiguration();
 
         const string defaultLayout = "${processtime} [${level:uppercase=true}] (${logger}) ${message:withexception=true}";
-        const string defaultHeader = "############ Nexus Mods App log file - ${longdate} ############";
+        const string defaultHeader = "############ NMA Community Edition log file - ${longdate} ############";
 
         FileTarget fileTarget;
         if (startupMode.RunAsMain)
