@@ -114,6 +114,14 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
   dernier SDK 10 avec `actions/setup-dotnet` : l'AppImage embarque le runtime que connaît ce SDK, et celui de
   l'image a souvent quelques correctifs de retard. Si le CDN de Microsoft échoue (erreurs 409 déjà vues), il
   garde celui de l'image. Sans aucun SDK 10, une étape de vérification échoue avec un message explicite.
+- `labels.yml` : crée ou met à jour les labels de `.github/labels.json` quand ce fichier change sur `main`, ou
+  à la demande. Un label utilisé par un modèle d'issue, dependabot ou un workflow doit y figurer : sinon les
+  modèles d'issues et dependabot l'ignorent.
+- `vulnerable-packages.yml` : chaque lundi et à la demande, échoue si un paquet NuGet, direct ou indirect, a une
+  vulnérabilité connue (`dotnet list package --vulnerable --include-transitive`). Dependabot ne voit pas les
+  dépendances indirectes.
+- Dependabot : NuGet une fois par mois, sans version majeure ni Avalonia (mise à jour à la main en testant
+  l'interface) ; actions GitHub chaque semaine.
 
 ## Release
 
