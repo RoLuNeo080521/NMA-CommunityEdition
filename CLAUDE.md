@@ -16,7 +16,7 @@ Instructions pour Claude Code (et tout contributeur) travaillant sur ce dépôt.
 
 **NMA Community Edition** est un fork communautaire non officiel de
 [Nexus-Mods/NexusMods.App](https://github.com/Nexus-Mods/NexusMods.App), centré sur **Linux**
-(Steam/Proton, GOG via Heroic ou Lutris, préfixes Wine) et distribué en **AppImage**.
+(Steam/Proton, GOG via Heroic ou Lutris, Epic via Heroic, préfixes Wine) et distribué en **AppImage**.
 
 - AppId `com.nmacommunity.app`, nom affiché `NMA Community Edition`, binaire `NMAcommunity.App`.
 - Application : `src/NexusMods.App/NexusMods.App.csproj`. Solution : `NexusMods.App.sln`.
