@@ -14,13 +14,14 @@
 
 Nexus Mods [paused the Nexus Mods App](https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq) to focus on Vortex. Vortex is a Windows app, so Linux players lost their native mod manager.
 
-**NMA Community Edition** keeps the app going for them. It handles Steam and Proton, GOG games installed with Heroic or Lutris, and Wine prefixes, and it ships as a single AppImage.
+**NMA Community Edition** keeps the app going for them. It handles Steam and Proton, GOG and Epic games installed with Heroic, GOG games installed with Lutris, and Wine prefixes, and it ships as a single AppImage.
 
 > This is an **unofficial fork**. It is not affiliated with, endorsed by or supported by Nexus Mods. All credit for the original application goes to the upstream team and contributors.
 
 ## What the fork adds
 
 - **GOG games installed with Lutris** are detected and launched, with recent Lutris versions and the Flatpak build.
+- **Epic games installed with Heroic** are detected and launched through Heroic, native and Flatpak.
 - **Game versions newer than the Nexus file database** (for example Cyberpunk 2077 2.5) are handled safely. NMA takes the game folder as it first indexed it as the original game files, so "Clean folder" no longer deletes the game.
 - **Fallout 4 end to end**, F4SE included, on Steam through Proton.
 - **The Play button follows the running game** on Linux, through launcher-to-game hand-offs.
@@ -45,7 +46,7 @@ The [release notes](../../releases) list every change.
 On Linux, NMA finds games installed with:
 
 - **Steam**, native and Proton games
-- **Heroic Games Launcher** (GOG)
+- **Heroic Games Launcher** (GOG and Epic Games Store)
 - **Lutris** (GOG), native and Flatpak
 - **Wine prefixes** (GOG and Epic Games Store installs)
 
@@ -66,7 +67,7 @@ chmod +x NMAcommunity.App.x86_64.AppImage
 The fork follows what players need rather than a fixed plan. Likely next steps:
 
 - **More games**, such as Starfield, Fallout: New Vegas and Oblivion, as time and testing allow.
-- **More Linux launchers**: Epic games through Heroic, Lutris beyond GOG, Bottles.
+- **More Linux launchers**: Lutris beyond GOG, Bottles.
 - **Bug fixes first.** Reports on the [issues page](../../issues) set the priorities.
 
 Suggestions and pull requests are welcome.

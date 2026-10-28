@@ -35,7 +35,8 @@ public class GameLocatorResult
 
     /// <summary>
     /// The identifier the launcher that installed the game uses to run it, when it isn't
-    /// <see cref="StoreIdentifier"/> (e.g. the Lutris game slug of a GOG game installed with Lutris).
+    /// <see cref="StoreIdentifier"/> (e.g. the Lutris game slug of a GOG game installed with Lutris, or the Legendary
+    /// app name of an Epic game installed with Heroic).
     /// </summary>
     public string? LauncherGameId { get; init; }
 

@@ -44,6 +44,7 @@ public static class ServiceExtensions
             {
                 serviceCollection.AddSingleton<IGameLocator>(serviceProvider => new SteamLocator(serviceProvider.GetServices<IGameData>(), serviceProvider.GetRequiredService<ILoggerFactory>(), serviceProvider.GetRequiredService<IFileSystem>(), registry: null));
                 serviceCollection.AddSingleton<IGameLocator, HeroicGOGLocator>();
+                serviceCollection.AddSingleton<IGameLocator, HeroicEpicLocator>();
                 serviceCollection.AddSingleton<IGameLocator, LutrisGOGLocator>();
 
                 serviceCollection.AddSingleton<IGameLocator>(serviceProvider =>

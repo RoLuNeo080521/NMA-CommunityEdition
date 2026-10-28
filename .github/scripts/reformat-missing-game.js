@@ -67,10 +67,7 @@ ${logs}
   // We may want to post a comment based on the responses.
   let commentBody = '';
   if (store === 'Manually Installed') {
-    commentBody = 'Games installed outside of a game store are not supported. Please install your game with Steam, Heroic or Lutris (GOG games only), or with GOG Galaxy or the Epic Games Launcher in a Wine prefix.';
-  }
-  else if (store === 'Heroic Games Launcher (Epic Games)') {
-    commentBody = `We currently only support GOG games installed with Heroic. Epic games are found when the Epic Games Launcher installed them in a Wine prefix; Heroic support is on the roadmap: https://github.com/RoLuNeo080521/NMA-CommunityEdition#roadmap`
+    commentBody = 'Games installed outside of a game store are not supported. Please install your game with Steam, Heroic (GOG and Epic games), Lutris (GOG games only), or with GOG Galaxy or the Epic Games Launcher in a Wine prefix.';
   }
   else if (['Linux', 'Steam Deck'].includes(os) && store === 'Lutris') {
     commentBody = `We currently only support GOG games installed with Lutris on Linux.`
