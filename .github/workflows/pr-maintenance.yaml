@@ -7,16 +7,21 @@ on:
     branches: [ main ]
     types: [ synchronize ]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   check-dirty:
     runs-on: ubuntu-latest
 
     steps:
       - name: "Check if PRs are dirty"
-        uses: eps1lon/actions-label-merge-conflict@releases/2.x
+        uses: eps1lon/actions-label-merge-conflict@0273be72a0bbd58fcd71d0d6c02c209b50d1e5e1 # v3.1.0
         with:
           dirtyLabel: "status-needs-rebase"
           removeOnDirtyLabel: "status-ready"
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          commentOnDirty: "This PR conflicts with `main`. You need to rebase the PR before it can be merged."
+          commentOnDirty: "This PR conflicts with `main`. Merge `main` into the branch, or rebase it, before it can be merged."
           commentOnClean: "This PR doesn't conflict with `main` anymore. It can be merged after all status checks have passed and it has been reviewed."

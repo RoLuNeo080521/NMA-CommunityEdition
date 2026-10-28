@@ -1,0 +1,48 @@
+# Fails when a NuGet package of the solution, used directly or not, has a known vulnerability. Dependabot doesn't
+# see the indirect NuGet dependencies, where most of them turn up. GitHub emails the owner when a scheduled run fails.
+name: "Vulnerable packages"
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # every Monday at 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # The restore needs neither the SMAPI submodule nor games.json: both are only checked or downloaded when building.
+      - uses: actions/checkout@v5
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Look for vulnerable packages
+        run: |
+          dotnet list package --vulnerable --include-transitive --format json > vulnerable.json
+          if jq -e '.problems[]? | select(.level == "error")' vulnerable.json > /dev/null; then
+            jq -r '.problems[].text' vulnerable.json
+            echo "::error::dotnet list package failed"
+            exit 1
+          fi
+
+          jq -r '.projects[]?.frameworks[]? | ((.topLevelPackages // []) + (.transitivePackages // []))[]
+                 | select(.vulnerabilities)
+                 | "\(.id) \(.resolvedVersion): \([.vulnerabilities[] | "\(.severity) \(.advisoryurl)"] | unique | join(", "))"' \
+            vulnerable.json | sort -u > vulnerable.txt
+
+          if [ -s vulnerable.txt ]; then
+            { echo "## Vulnerable packages"; echo; sed 's/^/- /' vulnerable.txt; } >> "$GITHUB_STEP_SUMMARY"
+            while read -r line; do echo "::error::$line"; done < vulnerable.txt
+            exit 1
+          fi
+          echo "No vulnerable package." >> "$GITHUB_STEP_SUMMARY"

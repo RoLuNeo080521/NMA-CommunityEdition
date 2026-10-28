@@ -3,30 +3,30 @@ description: 'Use this form to report when the app fails to locate a supported g
 title: 'Game Not Found'
 type: "Bug"
 labels:
-  - 'Epic: Game Support'
+  - 'game support'
   - user raised
 body:
   - type: markdown
     attributes:
       value: >-
-        Please remember that the Nexus Mods app is still in development and
-        supports a limited number of games. 
+        NMA Community Edition supports a limited number of games and Linux
+        launchers.
 
 
-        ## [See all supported games
-        here](https://nexus-mods.github.io/NexusMods.App/users/games/)
+        ## [See all supported games and launchers
+        here](https://github.com/RoLuNeo080521/NMA-CommunityEdition#supported-games)
 
 
         Check out [the
-        roadmap](https://trello.com/b/gPzMuIr3/nexus-mods-app-roadmap) to see
-        the upcoming games.
+        roadmap](https://github.com/RoLuNeo080521/NMA-CommunityEdition#roadmap)
+        to see what may come next.
   - type: checkboxes
     id: confirm-supported
     attributes:
       label: Supported Game Check
       description: >-
         I confirm that I have checked the [supported
-        games](https://nexus-mods.github.io/NexusMods.App/users/games/), and the
+        games](https://github.com/RoLuNeo080521/NMA-CommunityEdition#supported-games), and the
         game I am reporting is listed as supported but has not been found by the
         app.
       options:
@@ -40,8 +40,10 @@ body:
         Which supported game did the app fail to find?
         **If your game is not listed, it isn't supported yet.**
       options:
-        - Stardew Valley
         - Cyberpunk 2077
+        - Stardew Valley
+        - Skyrim Special Edition
+        - Fallout 4
         - Baldur's Gate 3
         - "Mount & Blade II: Bannerlord"
     validations:
@@ -52,10 +54,8 @@ body:
       label: Operating System
       description: Which operating system are you playing on?
       options:
-        - Windows
-        - Steam Deck
         - Linux
-        - macOS
+        - Steam Deck
     validations:
       required: true
   - type: input
@@ -73,12 +73,11 @@ body:
       description: Which game store/launcher is the game installed with?
       options:
         - Steam
-        - GOG Galaxy
-        - Epic Games Launcher
-        - Xbox Game Pass/Microsoft Store
         - Heroic Games Launcher (GOG)
         - Heroic Games Launcher (Epic Games)
         - Lutris
+        - GOG Galaxy (Wine prefix)
+        - Epic Games Launcher (Wine prefix)
         # - Rockstar Games Launcher
         # - Amazon Games
         # - Ubisoft Connect
@@ -93,8 +92,8 @@ body:
     attributes:
       label: Attach Log Files
       description: >-
-        Please attach your logs. If you are having issues finding your log
-        files, see [this
-        guide](https://nexus-mods.github.io/NexusMods.App/users/faq/LogFiles/).
+        Please attach your logs. They are in
+        `~/.local/state/NMAcommunity.App/Logs/`: attach the files starting
+        with `nmacommunity.app.main.` and `nmacommunity.app.slim.`.
     validations:
       required: true

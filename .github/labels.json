@@ -1,0 +1,37 @@
+[
+  {
+    "name": "user raised",
+    "color": "1d76db",
+    "description": "Reported by a user through an issue form"
+  },
+  {
+    "name": "game support",
+    "color": "5319e7",
+    "description": "A game that isn't found or isn't supported yet"
+  },
+  {
+    "name": "needs logs",
+    "color": "fbca04",
+    "description": "The report needs the app's log files"
+  },
+  {
+    "name": "needs-response",
+    "color": "d4c5f9",
+    "description": "Waiting for the reporter: closed after 3 weeks without an answer"
+  },
+  {
+    "name": "area-dependencies",
+    "color": "0366d6",
+    "description": "Dependency updates"
+  },
+  {
+    "name": "status-needs-rebase",
+    "color": "b60205",
+    "description": "The pull request conflicts with main"
+  },
+  {
+    "name": "status-ready",
+    "color": "0e8a16",
+    "description": "The pull request can be merged"
+  }
+]

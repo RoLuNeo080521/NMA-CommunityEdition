@@ -1,25 +1,25 @@
 version: 2
 updates:
+  # Monthly, minor and patch updates only. Avalonia is upgraded by hand, testing the UI.
   - package-ecosystem: "nuget"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
       time: "09:00"
-      timezone: "Europe/London"
-    reviewers:
-      - "Nexus-Mods/nexusmods-app-developers"
+      timezone: "Europe/Paris"
     labels:
       - "area-dependencies"
     allow:
       - dependency-name: "System.*"
       - dependency-name: "Microsoft.*"
       - dependency-name: "NexusMods.*"
-      - dependency-name: "Avalonia*"
       - dependency-name: "GameFinder*"
     ignore:
       # NOTE(erri120): "special" dependencies that are tied to the roslyn compiler version
       - dependency-name: "Microsoft.CodeAnalysis.CSharp*"
+      # Major versions change the .NET version or break APIs: they are done by hand
+      - dependency-name: "*"
+        update-types: [ "version-update:semver-major" ]
     groups:
       System:
         patterns:
@@ -30,9 +30,19 @@ updates:
       NexusMods:
         patterns:
           - "NexusMods.*"
-      Avalonia:
-        patterns:
-          - "Avalonia*"
       GameFinder:
         patterns:
           - "GameFinder*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    labels:
+      - "area-dependencies"
+    groups:
+      GitHubActions:
+        patterns:
+          - "*"
