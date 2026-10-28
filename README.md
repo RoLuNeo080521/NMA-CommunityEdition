@@ -68,6 +68,7 @@ The fork follows what players need rather than a fixed plan. Likely next steps:
 
 - **More games**, such as Starfield, Fallout: New Vegas and Oblivion, as time and testing allow.
 - **More Linux launchers**: Lutris beyond GOG, Bottles.
+- **Missing requirements**: warn, for every game, when a mod needs another mod that its Nexus Mods page lists as a requirement and that isn't installed.
 - **Bug fixes first.** Reports on the [issues page](../../issues) set the priorities.
 
 Suggestions and pull requests are welcome.
