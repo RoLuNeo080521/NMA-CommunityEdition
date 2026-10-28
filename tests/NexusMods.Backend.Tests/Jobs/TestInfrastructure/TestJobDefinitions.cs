@@ -73,14 +73,14 @@ public record WaitForCancellationJob(ManualResetEventSlim ReadySignal) : IJobDef
     public async ValueTask<string> StartAsync(IJobContext<WaitForCancellationJob> context)
     {
         ReadySignal.Set();
-        
-        while (!context.CancellationToken.IsCancellationRequested)
+
+        // Only YieldAsync ends the job, by throwing once cancelled: a loop condition on the token could also end it
+        // normally, when the cancellation lands between YieldAsync and the check
+        while (true)
         {
             await Task.Delay(10, CancellationToken.None);
             await context.YieldAsync();
         }
-
-        return "Should not reach here";
     }
 }
 
