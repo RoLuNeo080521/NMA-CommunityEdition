@@ -1,75 +1,105 @@
 <div align="center">
   <h1>NMA Community Edition</h1>
-  <p><em>A community-maintained fork of the Nexus Mods App, focused on keeping Linux modding alive.</em></p>
+  <p><strong>A community fork of the Nexus Mods App, built for modding on Linux.</strong></p>
+  <p>
+    <a href="https://github.com/RoLuNeo080521/NMA-CommunityEdition/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/RoLuNeo080521/NMA-CommunityEdition?sort=semver"></a>
+    <a href="https://github.com/RoLuNeo080521/NMA-CommunityEdition/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/RoLuNeo080521/NMA-CommunityEdition/actions/workflows/tests.yml/badge.svg"></a>
+    <a href="./LICENSE.md"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
+  </p>
 </div>
 
 ---
 
-## Introduction
+## Why this fork
 
-The official [Nexus Mods App](https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq) was paused by Nexus Mods / Black Tree Gaming Ltd. to refocus on Vortex. **NMA Community Edition** picks up where they left off, with a focus on the **Linux ecosystem** (Steam, GOG via Heroic or Lutris, Wine prefixes, etc.) — a use case the upstream app supported well but no longer maintains.
+Nexus Mods [paused the Nexus Mods App](https://help.nexusmods.com/article/164-discontinuing-the-nexus-mods-app-faq) to focus on Vortex. Vortex is a Windows app, so Linux players lost their native mod manager.
 
-This is an **unofficial fork**, not affiliated with, endorsed by, or supported by Nexus Mods. All credit for the original application goes to the upstream team and contributors.
+**NMA Community Edition** keeps the app going for them. It handles Steam and Proton, GOG games installed with Heroic or Lutris, and Wine prefixes, and it ships as a single AppImage.
 
-## Features
+> This is an **unofficial fork**. It is not affiliated with, endorsed by or supported by Nexus Mods. All credit for the original application goes to the upstream team and contributors.
 
-### Supported games
+## What the fork adds
 
-- **Cyberpunk 2077**
-- **Stardew Valley**
-- **Skyrim Special Edition**
-- **Fallout 4**
-- **Baldur's Gate 3**
-- **Mount & Blade II: Bannerlord**
+- **GOG games installed with Lutris** are detected and launched, with recent Lutris versions and the Flatpak build.
+- **Game versions newer than the Nexus file database** (for example Cyberpunk 2077 2.5) are handled safely. NMA takes the game folder as it first indexed it as the original game files, so "Clean folder" no longer deletes the game.
+- **Fallout 4 end to end**, F4SE included, on Steam through Proton.
+- **The Play button follows the running game** on Linux, through launcher-to-game hand-offs.
+- **No telemetry.** No diagnostic or usage data is sent to Nexus Mods. The app identifies itself as NMA Community Edition to the Nexus Mods API.
+- **A missing game no longer breaks the app.** If a managed game is uninstalled or moved, its loadouts are hidden until the game is found again.
+- **Many fixes to mod files and downloads**: files shared by two mods, deleted files that came back, downloads stuck "in progress", leftover temporary archives.
+- **Kept up to date**: ships .NET 10 and the latest runtime patch, keeps its dependencies free of known vulnerabilities, and tells you when a new release is out.
 
-### Supported stores
+The [release notes](../../releases) list every change.
 
-- **Steam** (native + Proton)
-- **GOG** (native, via Heroic Games Launcher or Lutris)
-- **Epic Games Store** (where applicable per game)
-- **Microsoft Store / Xbox Game Pass** (where applicable per game)
+## Supported games
 
-### Other
+| Game | Notes |
+|---|---|
+| Cyberpunk 2077 | REDmod load order |
+| Stardew Valley | SMAPI mods |
+| Skyrim Special Edition | SKSE launch |
+| Fallout 4 | F4SE launch |
+| Baldur's Gate 3 | |
+| Mount & Blade II: Bannerlord | |
 
-- **Linux-first**: bug fixes and packaging target Linux desktop environments first.
-- **9 UI languages**: English, French, German, Italian, Polish, Portuguese (Brazil), Russian, Turkish, Ukrainian — switchable in Settings > General > Language.
-- **AppImage** distribution for easy install on any Linux distribution.
+On Linux, NMA finds games installed with:
 
-## Roadmap
+- **Steam**, native and Proton games
+- **Heroic Games Launcher** (GOG)
+- **Lutris** (GOG), native and Flatpak
+- **Wine prefixes** (GOG and Epic Games Store installs)
 
-The fork follows community demand rather than a rigid roadmap. Likely directions:
+## Install
 
-- **More games**: porting / completing support for popular Nexus Mods titles (Starfield, Fallout: New Vegas, Oblivion, etc.) as time and testing allow.
-- **More Linux launchers**: Bottles and other Wine front-ends, and Lutris beyond GOG games.
-- **Continued bug fixes**: real-world issues reported on the [issues page](../../issues) drive priorities.
-
-If you want to suggest something or contribute, open an issue or pull request.
-
-## Installation
-
-Grab the latest AppImage from the [Releases page](../../releases), make it executable, and run it:
+Download `NMAcommunity.App.x86_64.AppImage` from the [latest release](../../releases/latest), make it executable and run it:
 
 ```bash
 chmod +x NMAcommunity.App.x86_64.AppImage
 ./NMAcommunity.App.x86_64.AppImage
 ```
 
-Detailed changes for each version are in the release notes, not duplicated here.
+- On a system without FUSE, run it with `APPIMAGE_EXTRACT_AND_RUN=1 ./NMAcommunity.App.x86_64.AppImage`.
+- Data lives in `~/.local/share/NMAcommunity.App/`, and logs in `~/.local/state/NMAcommunity.App/`. Both are separate from the official app, so the two can be installed side by side.
+
+## Roadmap
+
+The fork follows what players need rather than a fixed plan. Likely next steps:
+
+- **More games**, such as Starfield, Fallout: New Vegas and Oblivion, as time and testing allow.
+- **More Linux launchers**: Epic games through Heroic, Lutris beyond GOG, Bottles.
+- **Bug fixes first.** Reports on the [issues page](../../issues) set the priorities.
+
+Suggestions and pull requests are welcome.
 
 ## Building from source
 
 ```bash
 git clone --recurse-submodules https://github.com/RoLuNeo080521/NMA-CommunityEdition.git
 cd NMA-CommunityEdition
-dotnet build
+dotnet build --configuration Release
 ```
 
-You'll need the .NET 10 SDK installed, and network access to `data.nexusmods.com` during the build. In an existing clone, fetch the submodules with `git submodule update --init --recursive`: the build fails without them.
+You need:
+
+- the .NET 10 SDK;
+- network access to `data.nexusmods.com` during the build;
+- the git submodules. In an existing clone, fetch them with `git submodule update --init --recursive`.
+
+[`CLAUDE.md`](./CLAUDE.md) documents the build, tests, AppImage packaging and releases. It is written in French.
+
+## Made with Claude
+
+NMA Community Edition is maintained by [RoLuNeo080521](https://github.com/RoLuNeo080521) with **[Claude Code](https://claude.com/claude-code)**, Anthropic's AI coding assistant. Since v1.1.0, the fork's fixes and features have been built together:
+
+- **Claude** tracks bugs down to their root cause, writes the fixes and their tests, and prepares the pull requests and release notes.
+- **The maintainer** decides what goes in, tests each release's AppImage and publishes it.
+
+That partnership is what lets a one-person fork ship fixes this quickly. Commits written with Claude carry a `Co-Authored-By: Claude` trailer, and [`CLAUDE.md`](./CLAUDE.md) holds the project rules Claude works by.
 
 ## Credits
 
-All credit for the original application goes to the **Nexus Mods team** and the upstream contributors. The original repository is [Nexus-Mods/NexusMods.App](https://github.com/Nexus-Mods/NexusMods.App). This fork merely maintains community patches on top of their work.
+All credit for the original application goes to the **Nexus Mods team** and the upstream contributors. The original repository is [Nexus-Mods/NexusMods.App](https://github.com/Nexus-Mods/NexusMods.App), and this fork builds on their work.
 
 ## License
 
-GPL-3.0-only, as inherited from the upstream project. All original copyright notices are preserved. Full license text in [`LICENSE.md`](./LICENSE.md).
+GPL-3.0-only, as inherited from the upstream project. All original copyright notices are kept. The full text is in [`LICENSE.md`](./LICENSE.md).
