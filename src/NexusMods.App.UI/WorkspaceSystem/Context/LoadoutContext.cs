@@ -15,6 +15,7 @@ public record LoadoutContext : IWorkspaceContext
     public bool IsValid(IServiceProvider serviceProvider)
     {
         var loadout = Loadout.Load(serviceProvider.GetRequiredService<IConnection>().Db, LoadoutId.Value);
-        return loadout.IsValid();
+        // A workspace can't show a loadout whose game isn't detected anymore
+        return loadout.IsValid() && loadout.IsGameDetected();
     }
 }
