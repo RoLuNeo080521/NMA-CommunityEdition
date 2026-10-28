@@ -48,13 +48,18 @@ internal class SteamLocator : IGameLocator
 
             if (!_registeredGames.TryGetValue(storeIdentifier, out var game)) continue;
 
-            var path = gameFinderGame.Path;
-
             var locatorIds = gameFinderGame.AppManifest.InstalledDepots
                 .Select(x => LocatorId.From(x.Value.ManifestId.Value.ToString()))
                 .ToImmutableArray();
 
-            var winePrefixDirectoryPath = gameFinderGame.GetProtonPrefix()?.ProtonDirectory.Combine("pfx");
+            var protonPrefix = gameFinderGame.GetProtonPrefix();
+            var winePrefixDirectoryPath = protonPrefix?.ProtonDirectory.Combine("pfx");
+
+            // A game that Proton runs keeps its settings in its prefix, compatdata/<app id>/pfx
+            var path = protonPrefix is not null && OperatingSystem.IsLinux()
+                ? GameWinePrefix.InPrefix(gameFinderGame.Path, protonPrefix)
+                : gameFinderGame.Path;
+
             var linuxCompatibilityDataProvider = winePrefixDirectoryPath is not null ? new LinuxCompatibilityDataProvider(gameFinderGame, winePrefixDirectoryPath.Value) : null;
 
             var platform = linuxCompatibilityDataProvider is null ? OSInformation.Shared.Platform : OSPlatform.Windows;

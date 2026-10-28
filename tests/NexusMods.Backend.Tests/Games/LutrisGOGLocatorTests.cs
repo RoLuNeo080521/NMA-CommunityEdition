@@ -44,15 +44,18 @@ public class LutrisGOGLocatorTests : IDisposable
 
     private AbsolutePath GameFolder => _home.Combine("Games/cyberpunk-2077/Cyberpunk 2077");
 
-    private async Task WriteGameConfig(string gamesDirectory, string service = "gog")
+    private AbsolutePath PrefixFolder => _home.Combine("Games/cyberpunk-2077/pfx");
+
+    private async Task WriteGameConfig(string gamesDirectory, string service = "gog", bool withPrefix = true)
     {
         var gamesDir = _home.Combine(gamesDirectory);
         gamesDir.CreateDirectory();
+        var prefix = withPrefix ? $"prefix: {PrefixFolder}" : "";
         await gamesDir.Combine("cyberpunk-2077-1729000000.yml").WriteAllTextAsync(
             $"""
             game:
               exe: {GameFolder}/bin/x64/Cyberpunk2077.exe
-              prefix: {_home}/Games/cyberpunk-2077/pfx
+              {prefix}
             game_slug: cyberpunk-2077
             name: Cyberpunk 2077
             service: {service}
@@ -114,6 +117,31 @@ public class LutrisGOGLocatorTests : IDisposable
 
         await Assert.That(result.Path).IsEqualTo(GameFolder.Combine("bin/x64"));
         await Assert.That(result.LocatorIds.Select(id => id.Value)).IsEquivalentTo([ProductId.ToString()]);
+    }
+
+    [Test]
+    public async Task Test_ResolvesAppDataInTheWinePrefixOfTheGameConfig()
+    {
+        await WriteGameConfig(".local/share/lutris/games");
+        await WriteGameFiles(withGogInfo: true);
+
+        var result = CreateLocator().Locate().Single();
+
+        await Assert.That(result.Path).IsEqualTo(GameFolder);
+        await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
+            .IsEqualTo(PrefixFolder.Combine($"drive_c/users/{GameWinePrefix.LinuxUserName}/AppData/Local"));
+    }
+
+    [Test]
+    public async Task Test_WithoutPrefix_ResolvesAppDataOfTheLinuxUser()
+    {
+        await WriteGameConfig(".local/share/lutris/games", withPrefix: false);
+        await WriteGameFiles(withGogInfo: true);
+
+        var result = CreateLocator().Locate().Single();
+
+        await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
+            .IsEqualTo(_fileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory));
     }
 
     [Test]

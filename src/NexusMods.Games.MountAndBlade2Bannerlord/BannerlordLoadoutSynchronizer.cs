@@ -89,6 +89,9 @@ public class BannerlordLoadoutSynchronizer : ALoadoutSynchronizer
 
     private readonly BannerlordSettings _settings;
 
+    // Don't track the saves, like Skyrim's and Fallout 4's: resetting the game to its original state would delete them
+    protected override IGamePathFilter GamePathFilter { get; } = GamePathFilters.Create(path => path.LocationId == LocationId.Saves);
+
     public override bool IsIgnoredBackupPath(GamePath path)
     {
         if (_settings.DoFullGameBackup) return false;
