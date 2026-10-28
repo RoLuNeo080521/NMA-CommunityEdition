@@ -96,7 +96,7 @@ public class SpineViewModel : AViewModel<ISpineViewModel>, ISpineViewModel
                 var loadouts = Loadout.ObserveAll(_conn);
 
                 loadouts
-                    .Filter(loadout => loadout.IsVisible())
+                    .Filter(loadout => loadout.IsVisible() && IsGameDetected(loadout))
                     .TransformAsync(async loadout =>
                         {
                             await using var iconStream = await loadout.InstallationInstance.Game.IconImage.GetStreamAsync();
@@ -246,6 +246,14 @@ public class SpineViewModel : AViewModel<ISpineViewModel>, ISpineViewModel
                 Context = new MyGamesPageContext()
             }
         );
+    }
+
+    private bool IsGameDetected(Loadout.ReadOnly loadout)
+    {
+        if (loadout.IsGameDetected()) return true;
+
+        _logger.LogWarning("Hiding loadout `{Name}`: its game ({GameId} from {Store}) isn't detected anymore", loadout.Name, loadout.Installation.GameId, loadout.Installation.Store);
+        return false;
     }
 
     private void ChangeToLoadoutWorkspace(LoadoutId loadoutId)

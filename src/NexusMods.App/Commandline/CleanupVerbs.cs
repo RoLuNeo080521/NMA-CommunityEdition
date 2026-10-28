@@ -39,6 +39,7 @@ internal static class CleanupVerbs
         // Step 1: Revert the managed games to their original state
         var db = conn.Db;
         var managedInstallations = Loadout.All(db)
+            .Where(loadout => loadout.IsGameDetected())
             .Select(loadout => loadout.InstallationInstance)
             .Distinct();
 

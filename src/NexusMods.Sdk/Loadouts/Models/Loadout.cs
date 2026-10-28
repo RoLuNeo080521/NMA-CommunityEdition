@@ -93,6 +93,16 @@ public partial class Loadout : IModelDefinition
         }
 
         /// <summary>
+        /// Returns true if the game of this loadout is detected. When it isn't (uninstalled, moved, or its launcher
+        /// removed), <see cref="InstallationInstance"/> throws: lists of loadouts for the user should skip it.
+        /// </summary>
+        public bool IsGameDetected()
+        {
+            var gameRegistry = Db.Connection.ServiceProvider.GetRequiredService<IGameRegistry>();
+            return gameRegistry.TryGetGameInstallation(this, out _);
+        }
+
+        /// <summary>
         /// Returns true if the loadout should be visible to the user.
         /// A non-visible loadout should be treated as if it doesn't exist.
         /// </summary>

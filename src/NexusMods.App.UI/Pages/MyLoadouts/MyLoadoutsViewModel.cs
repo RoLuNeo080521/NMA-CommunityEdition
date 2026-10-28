@@ -31,7 +31,7 @@ public class MyLoadoutsViewModel : APageViewModel<IMyLoadoutsViewModel>, IMyLoad
         this.WhenActivated(d =>
         {
             Loadout.ObserveAll(conn)
-                .Filter(l => l.IsVisible())
+                .Filter(l => l.IsVisible() && l.IsGameDetected())
                 .DistinctValues(loadout => loadout.InstallationInstance)
                 .Transform(managedGameInstall =>
                     {
