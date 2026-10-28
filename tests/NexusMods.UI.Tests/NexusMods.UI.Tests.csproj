@@ -12,6 +12,8 @@
         <PackageReference Include="Avalonia.Headless" />
         <PackageReference Include="Verify.Xunit" />
         <PackageReference Include="Verify.ImageMagick"/>
+        <!-- Verify.ImageMagick allows Magick.NET 14.8.1, which has known vulnerabilities: use a fixed version -->
+        <PackageReference Include="Magick.NET-Q16-AnyCPU" />
     </ItemGroup>
 
     <ItemGroup>

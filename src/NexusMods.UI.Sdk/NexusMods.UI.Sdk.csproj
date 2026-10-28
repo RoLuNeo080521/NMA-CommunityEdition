@@ -11,6 +11,8 @@
         <PackageReference Include="Avalonia.AvaloniaEdit" />
         <PackageReference Include="Avalonia.Controls.DataGrid" />
         <PackageReference Include="Avalonia.Desktop" />
+        <!-- Pins the fixed version of a vulnerable dependency of Avalonia, see Directory.Packages.props -->
+        <PackageReference Include="Tmds.DBus.Protocol" />
         <PackageReference Include="Avalonia.Diagnostics" Condition="'$(Configuration)' == 'Debug'" />
         <PackageReference Include="Avalonia.ReactiveUI" />
         <PackageReference Include="Avalonia.Skia" />
