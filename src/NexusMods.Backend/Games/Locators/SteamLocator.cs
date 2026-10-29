@@ -73,6 +73,8 @@ internal class SteamLocator : IGameLocator
                 StoreIdentifier = storeIdentifier.ToString(),
                 Store = Store,
                 Locator = this,
+                // The Wine diagnostics and the REDmod deployment use the Proton prefix
+                LinuxCompatabilityDataProvider = linuxCompatibilityDataProvider,
             };
         }
     }

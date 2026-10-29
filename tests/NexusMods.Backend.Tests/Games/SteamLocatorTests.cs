@@ -107,6 +107,20 @@ public class SteamLocatorTests : IDisposable
     }
 
     [Test]
+    public async Task Test_ProtonGame_HasTheLinuxCompatibilityDataOfItsPrefix()
+    {
+        await WriteSteamLibrary();
+        ProtonPrefix.CreateDirectory();
+        await ProtonPrefix.Combine("winetricks.log").WriteAllTextAsync("d3dcompiler_47\nvcrun2022\n");
+
+        var provider = CreateLocator().Locate().Single().LinuxCompatabilityDataProvider;
+
+        await Assert.That(provider).IsNotNull();
+        await Assert.That(provider!.WinePrefixDirectoryPath).IsEqualTo(ProtonPrefix);
+        await Assert.That(await provider.GetInstalledWinetricksComponents(CancellationToken.None)).IsEquivalentTo(["d3dcompiler_47", "vcrun2022"]);
+    }
+
+    [Test]
     public async Task Test_NativeGame_ResolvesAppDataOfTheLinuxUser()
     {
         await WriteSteamLibrary();
@@ -117,5 +131,6 @@ public class SteamLocatorTests : IDisposable
         await Assert.That(result.Path).IsEqualTo(GameFolder);
         await Assert.That(result.Platform).IsEqualTo(OSPlatform.Linux);
         await Assert.That(localAppData.InFolder(SteamFolder.Combine("steamapps/compatdata"))).IsFalse();
+        await Assert.That(result.LinuxCompatabilityDataProvider).IsNull();
     }
 }
