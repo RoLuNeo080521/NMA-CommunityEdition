@@ -48,6 +48,8 @@ public class HeroicEpicLocatorTests : IDisposable
 
     private AbsolutePath GameFolder => _home.Combine("Games/Heroic/Cyberpunk 2077");
 
+    private AbsolutePath PrefixFolder => _home.Combine("Games/Heroic/Prefixes/default/Cyberpunk 2077");
+
     private async Task WriteInstalledJson(string legendaryDirectory, string appName = AppName, string platform = "Windows", bool isDlc = false)
     {
         var legendaryDir = _home.Combine(legendaryDirectory);
@@ -80,6 +82,26 @@ public class HeroicEpicLocatorTests : IDisposable
               "app_title": "Cyberpunk 2077",
               "asset_infos": { "Windows": { "app_name": "{{appName}}", "catalog_item_id": "{{CatalogItemId}}" } },
               "metadata": { "id": "{{CatalogItemId}}", "namespace": "77f2b98e2cef40c8a7437518bf420e47" }
+            }
+            """
+        );
+    }
+
+    private async Task WriteGameSettings(string legendaryDirectory, string wineType)
+    {
+        // legendaryConfig/legendary is in the Heroic config folder, next to GamesConfig
+        var gamesConfigDir = _home.Combine(legendaryDirectory).Parent.Parent.Combine("GamesConfig");
+        gamesConfigDir.CreateDirectory();
+        await gamesConfigDir.Combine($"{AppName}.json").WriteAllTextAsync(
+            $$"""
+            {
+              "{{AppName}}": {
+                "autoInstallDxvk": true,
+                "winePrefix": "{{PrefixFolder}}",
+                "wineVersion": { "bin": "/opt/wine/bin/wine", "name": "Wine Test", "type": "{{wineType}}" }
+              },
+              "version": "v0",
+              "explicit": true
             }
             """
         );
@@ -152,6 +174,34 @@ public class HeroicEpicLocatorTests : IDisposable
         await WriteMetadata(NativeLegendaryDir);
 
         await Assert.That(CreateLocator().Locate().Count()).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("proton", "pfx/drive_c/users/steamuser/AppData/Local")]
+    [Arguments("wine", "drive_c/users/{0}/AppData/Local")]
+    public async Task Test_ResolvesAppDataInTheWinePrefixOfTheGameSettings(string wineType, string localAppData)
+    {
+        await WriteInstalledJson(FlatpakLegendaryDir);
+        await WriteMetadata(FlatpakLegendaryDir);
+        await WriteGameSettings(FlatpakLegendaryDir, wineType);
+
+        var result = CreateLocator().Locate().Single();
+
+        await Assert.That(result.Path).IsEqualTo(GameFolder);
+        await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
+            .IsEqualTo(PrefixFolder.Combine(string.Format(localAppData, GameWinePrefix.LinuxUserName)));
+    }
+
+    [Test]
+    public async Task Test_WithoutGameSettings_ResolvesAppDataOfTheLinuxUser()
+    {
+        await WriteInstalledJson(NativeLegendaryDir);
+        await WriteMetadata(NativeLegendaryDir);
+
+        var result = CreateLocator().Locate().Single();
+
+        await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
+            .IsEqualTo(_fileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory));
     }
 
     [Test]

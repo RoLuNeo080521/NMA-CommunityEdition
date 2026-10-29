@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 using System.Text.Json;
+using GameFinder.Wine;
 using Microsoft.Extensions.Logging;
 using NexusMods.Paths;
 using NexusMods.Sdk.Games;
@@ -11,7 +12,8 @@ namespace NexusMods.Backend.Games.Locators;
 /// <summary>
 /// Detects GOG games installed via Lutris (Linux) by parsing the per-game
 /// YAML files in Lutris' games config folder. Each file carries the GOG
-/// product id (service_id), the Lutris game slug, and the exe path.
+/// product id (service_id), the Lutris game slug, the exe path, and the
+/// Wine prefix of a Windows game.
 /// </summary>
 internal class LutrisGOGLocator : IGameLocator
 {
@@ -110,8 +112,7 @@ internal class LutrisGOGLocator : IGameLocator
         if (string.IsNullOrWhiteSpace(exePath)) return null;
 
         // Lutris expands `~` itself, and resolves a relative exe against the game folder stored in its database
-        if (exePath.StartsWith("~/", StringComparison.Ordinal))
-            exePath = _fileSystem.GetKnownPath(KnownPath.HomeDirectory).Combine(exePath[2..]).ToString();
+        exePath = ExpandHome(exePath);
         if (!exePath.StartsWith('/'))
         {
             _logger.LogWarning("Ignoring Lutris game config {Path}: its exe path `{Exe}` is relative", yamlFile, exePath);
@@ -126,6 +127,9 @@ internal class LutrisGOGLocator : IGameLocator
             _logger.LogDebug("No goggame-{ProductId}.info above {Exe}, using the exe folder as the game folder", productId, exe);
 
         var path = gameFolder ?? exe.Parent;
+        if (ReadWinePrefix(gameMap) is { } winePrefix)
+            path = GameWinePrefix.InPrefix(path, winePrefix);
+
         var buildId = gameFolder is null ? null : ReadBuildId(gameFolder.Value.Combine($"goggame-{productId}.info"));
 
         // Same locator ids as GOGLocator: the build id, which the file hashes are indexed by, then the installed DLCs
@@ -164,6 +168,29 @@ internal class LutrisGOGLocator : IGameLocator
             if (directory.Combine(infoFileName).FileExists) return directory;
             if (directory == directory.GetRootDirectory()) return null;
         }
+    }
+
+    /// <summary>
+    /// The Wine prefix Lutris runs a Windows game in, where the game keeps its settings: the `prefix` of the game
+    /// config. Native Linux games have none. Lutris runs Proton builds through umu, whose prefixes
+    /// <see cref="GameWinePrefix.FromLauncherFolder"/> recognizes once the game ran.
+    /// </summary>
+    private WinePrefix? ReadWinePrefix(YamlMappingNode gameMap)
+    {
+        var prefix = GetScalar(gameMap, "prefix");
+        if (string.IsNullOrWhiteSpace(prefix)) return null;
+
+        prefix = ExpandHome(prefix);
+        if (!prefix.StartsWith('/')) return null;
+
+        return GameWinePrefix.FromLauncherFolder(_fileSystem.FromUnsanitizedFullPath(prefix), isProton: false);
+    }
+
+    private string ExpandHome(string path)
+    {
+        return path.StartsWith("~/", StringComparison.Ordinal)
+            ? _fileSystem.GetKnownPath(KnownPath.HomeDirectory).Combine(path[2..]).ToString()
+            : path;
     }
 
     private string? ReadBuildId(AbsolutePath infoFile)
