@@ -4,6 +4,7 @@ using DynamicData.Kernel;
 using Microsoft.Extensions.Logging;
 using NexusMods.Abstractions.Loadouts;
 using NexusMods.Games.Generic;
+using NexusMods.Games.Generic.Dependencies;
 using NexusMods.Games.RedEngine.Cyberpunk2077.SortOrder;
 using NexusMods.Paths;
 using NexusMods.Sdk.Games;
@@ -21,12 +22,18 @@ public class RedModDeployTool : ITool
     private readonly ILogger _logger;
     private readonly RedModSortOrderVariety _redModSortOrderVariety;
 
-    public RedModDeployTool(GameToolRunner toolRunner, TemporaryFileManager temporaryFileManager, ILogger<RedModDeployTool> logger, RedModSortOrderVariety sortOrderVariety)
+    /// <summary>
+    /// Only registered on Linux.
+    /// </summary>
+    private readonly AggregateProtontricksDependency? _protontricks;
+
+    public RedModDeployTool(GameToolRunner toolRunner, TemporaryFileManager temporaryFileManager, ILogger<RedModDeployTool> logger, RedModSortOrderVariety sortOrderVariety, AggregateProtontricksDependency? protontricks = null)
     {
         _logger = logger;
         _toolRunner = toolRunner;
         _temporaryFileManager = temporaryFileManager;
         _redModSortOrderVariety = sortOrderVariety;
+        _protontricks = protontricks;
     }
     
     public IEnumerable<GameId> GameIds => [Cyberpunk2077.Cyberpunk2077Game.GameId];
@@ -60,7 +67,19 @@ public class RedModDeployTool : ITool
             if (loadout.Installation.Store == GameStore.Steam)
             {
                 var linuxCompatibilityDataProvider = loadout.InstallationInstance.LocatorResult.LinuxCompatabilityDataProvider;
-                if (linuxCompatibilityDataProvider is null) return;
+                if (linuxCompatibilityDataProvider is null)
+                {
+                    _logger.LogWarning("Skip running redmod: the game has no Proton prefix");
+                    return;
+                }
+
+                // GameToolRunner runs redmod in the Proton prefix with protontricks-launch, and fails without it.
+                // MissingProtontricksForRedModEmitter tells the user to install protontricks.
+                if (_protontricks is null || !await _protontricks.IsAvailable())
+                {
+                    _logger.LogWarning("Skip running redmod: protontricks isn't installed");
+                    return;
+                }
 
                 var wineDirectory = linuxCompatibilityDataProvider.WinePrefixDirectoryPath;
                 var cDriveDirectory = wineDirectory.Combine("drive_c");

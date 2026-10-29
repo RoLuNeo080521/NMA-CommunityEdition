@@ -5,8 +5,8 @@ using NexusMods.Abstractions.Diagnostics.Emitters;
 using NexusMods.Abstractions.Diagnostics.Values;
 using NexusMods.Games.Generic.Dependencies;
 using NexusMods.Paths;
+using NexusMods.Sdk.Games;
 using NexusMods.Sdk.Loadouts;
-using static NexusMods.Games.RedEngine.Constants;
 namespace NexusMods.Games.RedEngine.Cyberpunk2077.Emitters;
 
 public partial class MissingProtontricksForRedModEmitter : ILoadoutDiagnosticEmitter
@@ -25,15 +25,17 @@ public partial class MissingProtontricksForRedModEmitter : ILoadoutDiagnosticEmi
         Loadout.ReadOnly loadout,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var install = loadout.InstallationInstance;
-        var locations = install.Locations;
-        var redModPath = locations.ToAbsolutePath(RedModPath);
-
         if (!FileSystem.Shared.OS.IsLinux || _protontricksDependency == null)
             yield break;
 
-        // If there is no REDmod EXE, we don't need Protontricks.
-        if (redModPath.FileExists)
+        // Protontricks runs REDmod in the Proton prefix of the Steam game (RedModDeployTool), when there are REDmods to deploy
+        if (loadout.InstallationInstance.LocatorResult.Store != GameStore.Steam)
+            yield break;
+        if (!MissingRedModEmitter.HasRedMods(loadout, out _, out _))
+            yield break;
+
+        // If there is no REDmod EXE, we don't need Protontricks: MissingRedModEmitter asks for the REDmod DLC first.
+        if (!MissingRedModEmitter.HasRedModToolInstalled(loadout, out _))
             yield break;
 
         var installInfo = await _protontricksDependency.QueryInstallationInformation(cancellationToken);
