@@ -10,6 +10,7 @@ namespace NexusMods.Backend.Games.Locators;
 internal class HeroicGOGLocator : IGameLocator
 {
     private readonly ILogger _logger;
+    private readonly IFileSystem _fileSystem;
     private readonly HeroicGOGHandler _handler;
     private readonly FrozenDictionary<long, IGameData> _registeredGames;
 
@@ -18,6 +19,7 @@ internal class HeroicGOGLocator : IGameLocator
     public HeroicGOGLocator(IEnumerable<IGameData> games, ILoggerFactory loggerFactory, IFileSystem fileSystem)
     {
         _logger = loggerFactory.CreateLogger<HeroicGOGHandler>();
+        _fileSystem = fileSystem;
 
         _handler = new HeroicGOGHandler(
             fileSystem: fileSystem,
@@ -44,7 +46,7 @@ internal class HeroicGOGLocator : IGameLocator
 
             if (!_registeredGames.TryGetValue(storeIdentifier, out var game)) continue;
 
-            var path = GetPath(gameFinderGame);
+            var (path, winePrefixRunner) = UseWinePrefix(gameFinderGame);
             var dlcIds = gameFinderGame.InstalledDLCs.Select(x => LocatorId.From(x.Value.ToString()));
 
             ImmutableArray<LocatorId> locatorIds =
@@ -61,27 +63,31 @@ internal class HeroicGOGLocator : IGameLocator
                 StoreIdentifier = storeIdentifier.ToString(),
                 Store = Store,
                 Locator = this,
+                WinePrefixRunner = winePrefixRunner,
             };
         }
     }
 
     /// <summary>
-    /// Heroic runs a Windows game in the Wine prefix of its game settings, where the game keeps its settings.
-    /// GameFinder's HeroicGOGGame.GetWinePrefix() always assumes a Proton prefix.
+    /// Heroic runs a Windows game in the Wine prefix of its game settings, where the game keeps its settings, and runs
+    /// its tools there with the same Wine or Proton build. GameFinder's HeroicGOGGame.GetWinePrefix() always assumes a
+    /// Proton prefix.
     /// </summary>
-    private AbsolutePath GetPath(HeroicGOGGame game)
+    private (AbsolutePath Path, IWinePrefixRunner? WinePrefixRunner) UseWinePrefix(HeroicGOGGame game)
     {
-        if (game.WineData is not { } wineData) return game.Path;
+        if (game.WineData is not { } wineData) return (game.Path, null);
 
         try
         {
-            var prefix = GameWinePrefix.FromLauncherFolder(wineData.WinePrefixPath, isProton: wineData.WineVersion?.Type == "proton");
-            return GameWinePrefix.InPrefix(game.Path, prefix);
+            var wineType = wineData.WineVersion?.Type;
+            var prefix = GameWinePrefix.FromLauncherFolder(wineData.WinePrefixPath, isProton: wineType == "proton");
+            var runner = HeroicWinePrefixRunner.Create(_fileSystem, wineData.WinePrefixPath, prefix, wineData.WineVersion?.Bin, wineType);
+            return (GameWinePrefix.InPrefix(game.Path, prefix), runner);
         }
         catch (Exception e)
         {
             _logger.LogWarning(e, "Failed to use the Wine prefix `{Prefix}` of '{GameName}'", wineData.WinePrefixPath, game.Name);
-            return game.Path;
+            return (game.Path, null);
         }
     }
 }

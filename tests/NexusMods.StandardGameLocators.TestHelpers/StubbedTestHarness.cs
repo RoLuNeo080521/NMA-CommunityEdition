@@ -11,7 +11,8 @@ public static class StubbedTestHarnessExtensions
         this IServiceCollection services,
         Version version,
         Dictionary<RelativePath, byte[]>? gameFiles = null,
-        GameStore[]? stores = null)
+        GameStore[]? stores = null,
+        IWinePrefixRunner? winePrefixRunner = null)
         where TGame : IGame
     {
         services
@@ -21,7 +22,7 @@ public static class StubbedTestHarnessExtensions
                     s.GetRequiredService<IFileSystem>(),
                     s.GetRequiredService<TemporaryFileManager>(),
                     gameFiles,
-                    stores));
+                    stores) { WinePrefixRunner = winePrefixRunner });
 
         return services;
     }

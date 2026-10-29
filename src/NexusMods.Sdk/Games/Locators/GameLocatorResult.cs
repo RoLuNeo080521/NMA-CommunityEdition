@@ -62,4 +62,10 @@ public class GameLocatorResult
     /// Optional linux compatability data provider.
     /// </summary>
     public ILinuxCompatabilityDataProvider? LinuxCompatabilityDataProvider { get; init; }
+
+    /// <summary>
+    /// Runs the Windows tools of a game installed with Heroic or Lutris in its Wine prefix. Steam games run them with
+    /// protontricks instead.
+    /// </summary>
+    public IWinePrefixRunner? WinePrefixRunner { get; init; }
 }

@@ -113,8 +113,9 @@ internal class HeroicEpicLocator : IGameLocator
 
             // legendaryDir is heroic/legendaryConfig/legendary
             var path = _fileSystem.FromUnsanitizedFullPath(installPath);
-            if (ReadWinePrefix(legendaryDir.Parent.Parent, appName) is { } prefix)
-                path = GameWinePrefix.InPrefix(path, prefix);
+            var wineSettings = ReadWineSettings(legendaryDir.Parent.Parent, appName);
+            if (wineSettings is { } settings)
+                path = GameWinePrefix.InPrefix(path, settings.Prefix);
 
             _logger.LogDebug("Found Epic game `{AppName}` ({StoreIdentifier}) installed with Heroic at {Path}", appName, storeIdentifier, path);
 
@@ -130,6 +131,7 @@ internal class HeroicEpicLocator : IGameLocator
                 Locator = this,
                 // Heroic runs its Epic games by app name: heroic://launch?appName=<app name>&runner=legendary
                 LauncherGameId = appName,
+                WinePrefixRunner = wineSettings?.Runner,
             };
         }
     }
@@ -162,10 +164,11 @@ internal class HeroicEpicLocator : IGameLocator
     }
 
     /// <summary>
-    /// The Wine prefix of the game settings, where the game keeps its settings: the `winePrefix` of the
-    /// `&lt;app name&gt;` object, like GameFinder reads it for the GOG games installed with Heroic.
+    /// The Wine prefix of the game settings, where the game keeps its settings, and the runner of its tools: the
+    /// `winePrefix` and `wineVersion` of the `&lt;app name&gt;` object, like GameFinder reads them for the GOG games
+    /// installed with Heroic.
     /// </summary>
-    private WinePrefix? ReadWinePrefix(AbsolutePath heroicDir, string appName)
+    private (WinePrefix Prefix, IWinePrefixRunner? Runner)? ReadWineSettings(AbsolutePath heroicDir, string appName)
     {
         if (appName.Contains('/')) return null;
 
@@ -187,11 +190,13 @@ internal class HeroicEpicLocator : IGameLocator
             var winePrefix = GetString(settings, "winePrefix");
             if (string.IsNullOrWhiteSpace(winePrefix) || !winePrefix.StartsWith('/')) return null;
 
-            var wineType = settings.TryGetProperty("wineVersion", out var wineVersion) && wineVersion.ValueKind == JsonValueKind.Object
-                ? GetString(wineVersion, "type")
-                : null;
+            var hasWineVersion = settings.TryGetProperty("wineVersion", out var wineVersion) && wineVersion.ValueKind == JsonValueKind.Object;
+            var wineType = hasWineVersion ? GetString(wineVersion, "type") : null;
+            var wineBinary = hasWineVersion ? GetString(wineVersion, "bin") : null;
 
-            return GameWinePrefix.FromLauncherFolder(_fileSystem.FromUnsanitizedFullPath(winePrefix), isProton: wineType == "proton");
+            var launcherFolder = _fileSystem.FromUnsanitizedFullPath(winePrefix);
+            var prefix = GameWinePrefix.FromLauncherFolder(launcherFolder, isProton: wineType == "proton");
+            return (prefix, HeroicWinePrefixRunner.Create(_fileSystem, launcherFolder, prefix, wineBinary, wineType));
         }
         catch (Exception e)
         {

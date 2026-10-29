@@ -81,26 +81,49 @@ public class RedModDeployTool : ITool
                     return;
                 }
 
-                var wineDirectory = linuxCompatibilityDataProvider.WinePrefixDirectoryPath;
-                var cDriveDirectory = wineDirectory.Combine("drive_c");
-
-                if (!cDriveDirectory.DirectoryExists()) cDriveDirectory.CreateDirectory();
-                var tmpFile = cDriveDirectory.Combine("modlist.txt");
-                await using (var input = loadorderFile.Path.Read())
-                await using (var output = tmpFile.Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None))
-                {
-                    await input.CopyToAsync(output, cancellationToken: cancellationToken);
-                }
+                await CopyLoadOrderToPrefix(loadorderFile.Path, linuxCompatibilityDataProvider.WinePrefixDirectoryPath, cancellationToken);
 
                 await using var batchPath = await ExtractTemporaryDeployScript();
-                var command = Cli.Wrap(batchPath.ToString()).WithArguments(["deploy", "-force", "-modlist=C:\\modlist.txt"], escape: true);
+                var command = Cli.Wrap(batchPath.ToString()).WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile], escape: true);
                 await _toolRunner.ExecuteAsync(loadout, command, true, cancellationToken);
-            }            
+            }
+            else if (loadout.InstallationInstance.LocatorResult.WinePrefixRunner is { } winePrefixRunner)
+            {
+                // Games installed with Heroic or Lutris: run redmod in their prefix, with the Wine or Proton build of their launcher
+                var command = Cli.Wrap(exe.ToString())
+                    .WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile], true)
+                    .WithWorkingDirectory(exe.Parent.ToString());
+
+                var wineCommand = winePrefixRunner.MakeRunCommand(command);
+                if (wineCommand is null)
+                {
+                    _logger.LogWarning("Skip running redmod: the Wine or Proton build the launcher runs the game with isn't installed");
+                    return;
+                }
+
+                await CopyLoadOrderToPrefix(loadorderFile.Path, winePrefixRunner.WinePrefixDirectoryPath, cancellationToken);
+                await _toolRunner.ExecuteAsync(loadout, wineCommand, true, cancellationToken);
+            }
             else
             {
-                _logger.LogWarning("Skip running redmod, it's only supported for Steam on Linux at the moment");
+                _logger.LogWarning("Skip running redmod: the Wine prefix of the game is unknown");
             }
         }
+    }
+
+    /// <summary>
+    /// The load order file in the Wine prefix, where redmod reads it.
+    /// </summary>
+    private const string PrefixLoadOrderFile = "C:\\modlist.txt";
+
+    private static async Task CopyLoadOrderToPrefix(AbsolutePath loadorderFilePath, AbsolutePath winePrefixDirectory, CancellationToken cancellationToken)
+    {
+        var cDriveDirectory = winePrefixDirectory.Combine("drive_c");
+        if (!cDriveDirectory.DirectoryExists()) cDriveDirectory.CreateDirectory();
+
+        await using var input = loadorderFilePath.Read();
+        await using var output = cDriveDirectory.Combine("modlist.txt").Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        await input.CopyToAsync(output, cancellationToken: cancellationToken);
     }
 
     internal async Task WriteLoadOrderFile(AbsolutePath loadorderFilePath, Loadout.ReadOnly loadout)
