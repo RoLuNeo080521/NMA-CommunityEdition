@@ -41,6 +41,7 @@ public class RedModDeployTool : ITool
     public async Task Execute(Loadout.ReadOnly loadout, CancellationToken cancellationToken)
     {
         var exe = loadout.InstallationInstance.Locations.ToAbsolutePath(RedModPath);
+        var gameFolder = loadout.InstallationInstance.Locations.ToAbsolutePath(new GamePath(LocationId.Game, RelativePath.Empty));
         var deployFolder = loadout.InstallationInstance.Locations.ToAbsolutePath(RedModDeployFolder);
 
         await using var loadorderFile = _temporaryFileManager.CreateFile();
@@ -81,17 +82,19 @@ public class RedModDeployTool : ITool
                     return;
                 }
 
-                await CopyLoadOrderToPrefix(loadorderFile.Path, linuxCompatibilityDataProvider.WinePrefixDirectoryPath, cancellationToken);
+                var winePrefixDirectory = linuxCompatibilityDataProvider.WinePrefixDirectoryPath;
+                await CopyLoadOrderToPrefix(loadorderFile.Path, winePrefixDirectory, cancellationToken);
 
                 await using var batchPath = await ExtractTemporaryDeployScript();
-                var command = Cli.Wrap(batchPath.ToString()).WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile], escape: true);
+                var command = Cli.Wrap(batchPath.ToString())
+                    .WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile, "-root=" + ToWinePath(gameFolder, winePrefixDirectory)], escape: true);
                 await _toolRunner.ExecuteAsync(loadout, command, true, cancellationToken);
             }
             else if (loadout.InstallationInstance.LocatorResult.WinePrefixRunner is { } winePrefixRunner)
             {
                 // Games installed with Heroic or Lutris: run redmod in their prefix, with the Wine or Proton build of their launcher
                 var command = Cli.Wrap(exe.ToString())
-                    .WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile], true)
+                    .WithArguments(["deploy", "-force", "-modlist=" + PrefixLoadOrderFile, "-root=" + ToWinePath(gameFolder, winePrefixRunner.WinePrefixDirectoryPath)], true)
                     .WithWorkingDirectory(exe.Parent.ToString());
 
                 var wineCommand = winePrefixRunner.MakeRunCommand(command);
@@ -115,6 +118,22 @@ public class RedModDeployTool : ITool
     /// The load order file in the Wine prefix, where redmod reads it.
     /// </summary>
     private const string PrefixLoadOrderFile = "C:\\modlist.txt";
+
+    /// <summary>
+    /// The path of <paramref name="path"/> for a program running in the Wine prefix: C:\ is its drive_c, and Z:\ the
+    /// root of the file system.
+    /// </summary>
+    /// <remarks>
+    /// Without -root, redmod uses the folder it runs from, tools\redmod\bin, as the game folder: it finds no mods
+    /// and deploys nothing (REDmodLog.txt: "Invalid root path found", "No mods found").
+    /// </remarks>
+    internal static string ToWinePath(AbsolutePath path, AbsolutePath winePrefixDirectory)
+    {
+        var cDrive = winePrefixDirectory.Combine("drive_c");
+        return path.InFolder(cDrive)
+            ? "C:\\" + path.RelativeTo(cDrive).ToString().Replace('/', '\\')
+            : "Z:" + path.ToString().Replace('/', '\\');
+    }
 
     private static async Task CopyLoadOrderToPrefix(AbsolutePath loadorderFilePath, AbsolutePath winePrefixDirectory, CancellationToken cancellationToken)
     {

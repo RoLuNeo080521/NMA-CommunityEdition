@@ -1,4 +1,5 @@
 using CliWrap;
+using CliWrap.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using NexusMods.Abstractions.Loadouts;
@@ -53,10 +54,14 @@ public class RedModDeployToolWineTests : AIsolatedGameTest<RedModDeployToolWineT
         await Tool.Execute(loadout, CancellationToken.None);
 
         var redMod = GameInstallation.Locations.ToAbsolutePath(Constants.RedModPath);
+        var gameFolder = GameInstallation.Locations.ToAbsolutePath(new GamePath(LocationId.Game, RelativePath.Empty));
         var command = _winePrefixRunner.RunCommand;
         command.Should().NotBeNull();
         command!.TargetFilePath.Should().Be(redMod.ToString());
-        command.Arguments.Should().Be("deploy -force -modlist=C:\\modlist.txt");
+        // The game folder of the test is outside the prefix: redmod sees it through Z:
+        command.Arguments.Should().Be(new ArgumentsBuilder()
+            .Add(["deploy", "-force", "-modlist=C:\\modlist.txt", "-root=Z:" + gameFolder.ToString().Replace('/', '\\')])
+            .Build());
         command.WorkingDirPath.Should().Be(redMod.Parent.ToString());
         PrefixLoadOrderFile.FileExists.Should().BeTrue();
     }
@@ -87,5 +92,26 @@ public class RedModDeployToolWineTests : AIsolatedGameTest<RedModDeployToolWineT
             // A command that succeeds, in place of Wine
             return HasWine ? Cli.Wrap("true") : null;
         }
+    }
+}
+
+public class RedModWinePathTests
+{
+    private static readonly AbsolutePath Prefix = FileSystem.Shared.FromUnsanitizedFullPath("/home/user/Games/gog/cyberpunk-2077");
+
+    [Fact]
+    public void GameInDriveC_IsOnDriveC()
+    {
+        var gameFolder = Prefix.Combine("drive_c/GOG Games/Cyberpunk 2077");
+
+        RedModDeployTool.ToWinePath(gameFolder, Prefix).Should().Be(@"C:\GOG Games\Cyberpunk 2077");
+    }
+
+    [Fact]
+    public void GameOutsideThePrefix_IsOnDriveZ()
+    {
+        var gameFolder = FileSystem.Shared.FromUnsanitizedFullPath("/home/user/Games/Heroic/Cyberpunk 2077");
+
+        RedModDeployTool.ToWinePath(gameFolder, Prefix).Should().Be(@"Z:\home\user\Games\Heroic\Cyberpunk 2077");
     }
 }
