@@ -6,10 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using NexusMods.Abstractions.Games;
 using NexusMods.Abstractions.Loadouts;
 using NexusMods.Games.RedEngine.Cyberpunk2077;
+using NexusMods.Games.RedEngine.Cyberpunk2077.Extensions;
 using NexusMods.Games.RedEngine.Cyberpunk2077.SortOrder;
 using NexusMods.Games.TestFramework;
 using NexusMods.MnemonicDB.Abstractions.ElementComparers;
 using NexusMods.Paths;
+using NexusMods.Sdk.Games;
 using NexusMods.Sdk.Loadouts;
 using OneOf;
 using R3;
@@ -71,6 +73,35 @@ public class RedModDeployToolTests : ACyberpunkIsolatedGameTest<Cyberpunk2077Gam
         await Task.Delay(TimeSpan.FromSeconds(2)); 
         
         await Verify(await WriteLoadoutFile(loadout));
+    }
+
+    [Fact]
+    public async Task LoadOrderDoesNotContainModsDeletedFromTheGameFolder()
+    {
+        // Ensure the SortOrderManager is created and subscribed to loadout changes
+        var sortOrderManager = InitAndGetSortOrderManager();
+        var redModSortOrderVariety = ServiceProvider.GetRequiredService<RedModSortOrderVariety>();
+        var loadout = await CreateLoadout();
+        loadout = await AddRedMods(loadout);
+        loadout = await Synchronizer.Synchronize(loadout);
+
+        // The user deletes the folder of a REDmod, then applies the loadout: the files stay in the mod, hidden by deleted files
+        loadout.InstallationInstance.Locations.ToAbsolutePath(new GamePath(LocationId.Game, "mods/Driver_Shotguns")).DeleteDirectory(recursive: true);
+        loadout = await Synchronizer.Synchronize(loadout);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await sortOrderManager.UpdateLoadOrders(loadout.LoadoutId, token: cts.Token);
+
+        var optionalSortOrderId = redModSortOrderVariety.GetSortOrderIdFor(OneOf<LoadoutId, CollectionGroupId>.FromT0(loadout.LoadoutId), Connection.Db);
+        optionalSortOrderId.HasValue.Should().BeTrue("RedModSortOrderVariety should have a SortOrderId for the loadout");
+        var sortOrderId = optionalSortOrderId.Value;
+
+        // The load order page shows the persisted items
+        Connection.Db.RetrieveRedModSortableEntries(sortOrderId).Select(item => item.RedModFolderName.ToString())
+            .Should().NotContain("Driver_Shotguns").And.Contain("maestros_of_synth_the_dirge");
+        redModSortOrderVariety.GetSortOrderItems(sortOrderId, Connection.Db).Select(item => item.DisplayName)
+            .Should().NotContain("Driver_Shotguns").And.Contain("maestros_of_synth_the_dirge");
+        (await WriteLoadoutFile(loadout)).Should().NotContain("Driver_Shotguns").And.Contain("maestros_of_synth_the_dirge");
     }
 
     [Theory]

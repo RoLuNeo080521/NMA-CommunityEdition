@@ -10,8 +10,15 @@ WHERE s.ParentSortOrder = sortOrderId
 ORDER BY s.SortIndex;
 
 
--- Return loadout mod groups that contain a `mods/<folderName>/info.json` file for a given loadout
+-- Return loadout mod groups that contain a `mods/<folderName>/info.json` file for a given loadout.
+-- When the user deletes a file from the game folder, the synchronizer adds a deleted file at its path to the overrides
+-- group, which hides the files of the mods at this path: the info.json isn't there anymore.
 CREATE MACRO redmod.LoadoutRedModGroups(db, loadoutId, gameLocationId) AS TABLE
+WITH deletedPaths AS (
+    SELECT deleted.TargetPath
+    FROM synchronizer.LeafLoadoutItems(db) as deleted
+    WHERE deleted.IsDeleted AND deleted.IsEnabled
+)
 SELECT
     regexp_extract(file.TargetPath.Item3, '^mods\/([^\/]+)\/info\.json$', 1, 'i') AS ModFolderName,
     enabledState.IsEnabled AS IsEnabled,
@@ -22,7 +29,8 @@ JOIN synchronizer.LeafLoadoutItems(db) as enabledState ON file.Id = enabledState
 JOIN mdb_LoadoutItemGroup(Db=>db) as groupItem ON file.Parent = groupItem.Id
 WHERE file.TargetPath.Item1 = loadoutId
     AND file.TargetPath.Item2 = gameLocationId
-    AND ModFolderName != '';
+    AND ModFolderName != ''
+    AND file.TargetPath NOT IN (SELECT TargetPath FROM deletedPaths);
 
 
 -- Return winning loadout red mod groups in case of multiple mods containing the same redmod folder

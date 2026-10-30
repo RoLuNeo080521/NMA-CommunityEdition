@@ -1,0 +1,12 @@
+﻿[
+  {
+    FromPath: bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/info.json,
+    Hash: 0xCCEAC66980658CA0,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/info.json
+  },
+  {
+    FromPath: bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/init.lua,
+    Hash: 0xD2C678E71A3ACB3F,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/init.lua
+  }
+]

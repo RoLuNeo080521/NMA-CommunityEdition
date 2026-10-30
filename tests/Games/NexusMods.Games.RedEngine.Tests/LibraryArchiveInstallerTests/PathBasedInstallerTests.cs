@@ -40,6 +40,23 @@ public class PathBasedInstallerTests(ITestOutputHelper outputHelper) : ALibraryA
             "archive/pc/mod/mymod.archive",
             "archive/pc/mod/mymod.xl",
         ] ),
+        // Cyber Engine Tweaks mods packed without bin/x64/plugins/cyber_engine_tweaks/mods: their folder has an init.lua,
+        // and a folder inside it is part of the mod
+        ( "CET Mod At Root", typeof(SimpleOverlayModInstaller), [
+            "bike_mode_impact_topple/info.json",
+            "bike_mode_impact_topple/init.lua",
+            "bike_mode_impact_topple/modules/ui/init.lua",
+            "readme.txt",
+        ] ),
+        ( "CET Mod Next To Other Roots", typeof(SimpleOverlayModInstaller), [
+            "MyMod/r6/scripts/MyMod/Core.reds",
+            "MyMod/my_mod/init.lua",
+            "MyMod/my_mod/config.json",
+        ] ),
+        ( "CET Mod With Full Path", typeof(SimpleOverlayModInstaller), [
+            "bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/info.json",
+            "bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/init.lua",
+        ] ),
         ( "Files with no folder", typeof(FolderlessModInstaller), ["folder/filea.archive", "fileb.archive"] ),
         ( "Ignored Extensions", typeof(FolderlessModInstaller), ["folder/filea.archive", "file.txt", "docs/file.md", "bin/x64/file.pdf", "bin/x64/file.png"] ),
         ( "Appearance Preset", typeof(AppearancePresetInstaller), ["cool_choom.preset"] ),
