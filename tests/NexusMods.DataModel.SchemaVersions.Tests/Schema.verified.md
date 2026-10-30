@@ -3,8 +3,8 @@ This schema is written to a markdown file for both documentation and validation 
 models in the app, then validate the tests to update this file. 
 
 ## Statistics
-   - Fingerprint: 0x03E30ECD79A64605
-   - Total attributes: 232
+   - Fingerprint: 0xC8C8923BEDC2498F
+   - Total attributes: 233
    - Total namespaces: 75
    
 ## Attributes
@@ -95,6 +95,7 @@ models in the app, then validate the tests to update this file.
 | NexusMods.Loadouts.GameMetadata/LastScannedDiskStateTransaction                    | Reference               | False   | False | False     | 
 | NexusMods.Loadouts.GameMetadata/LastSyncedLoadout                                  | Reference               | False   | False | False     | 
 | NexusMods.Loadouts.GameMetadata/LastSyncedLoadoutTransaction                       | Reference               | False   | False | False     | 
+| NexusMods.Loadouts.GameMetadata/LastSyncedLocations                                | Utf8                    | False   | False | False     | 
 | NexusMods.Loadouts.GameMetadata/Name                                               | Utf8                    | False   | False | False     | 
 | NexusMods.Loadouts.GameMetadata/Path                                               | Utf8                    | True    | False | False     | 
 | NexusMods.Loadouts.GameMetadata/Store                                              | Ascii                   | False   | False | False     | 
