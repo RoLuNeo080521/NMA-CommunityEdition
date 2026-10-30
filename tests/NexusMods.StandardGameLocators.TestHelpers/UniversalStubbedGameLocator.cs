@@ -9,6 +9,7 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
     where TGame : IGame
 {
     private readonly TemporaryPath _path;
+    private readonly IFileSystem _fileSystem;
     private readonly TGame _game;
     private readonly GameStore[] _stores;
 
@@ -19,6 +20,12 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
     /// </summary>
     public IWinePrefixRunner? WinePrefixRunner { get; init; }
 
+    /// <summary>
+    /// Folders that stand in for known folders like AppData, as in the Wine prefix of a game: the game locations in
+    /// them are there instead of in the folders of the user running the tests.
+    /// </summary>
+    public IReadOnlyDictionary<KnownPath, AbsolutePath>? KnownPaths { get; init; }
+
     public UniversalStubbedGameLocator(
         IServiceProvider serviceProvider,
         IFileSystem fileSystem,
@@ -27,6 +34,7 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
         GameStore[]? stores = null)
     {
         _stores = stores ?? [GameStore.Unknown];
+        _fileSystem = fileSystem;
         _path = fileManager.CreateFolder(typeof(TGame).Name);
         _game = serviceProvider.GetRequiredService<TGame>();
 
@@ -49,7 +57,7 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
                 Locator = this,
                 LocatorIds = [..LocatorIds],
                 Store = store,
-                Path = _path,
+                Path = KnownPaths is null ? _path : _path.Path.WithFileSystem(_fileSystem.CreateOverlayFileSystem(new Dictionary<AbsolutePath, AbsolutePath>(), new Dictionary<KnownPath, AbsolutePath>(KnownPaths))),
                 StoreIdentifier = LocatorIds[0].Value,
                 WinePrefixRunner = WinePrefixRunner,
             };

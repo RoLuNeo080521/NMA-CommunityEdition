@@ -12,7 +12,8 @@ public static class StubbedTestHarnessExtensions
         Version version,
         Dictionary<RelativePath, byte[]>? gameFiles = null,
         GameStore[]? stores = null,
-        IWinePrefixRunner? winePrefixRunner = null)
+        IWinePrefixRunner? winePrefixRunner = null,
+        IReadOnlyDictionary<KnownPath, AbsolutePath>? knownPaths = null)
         where TGame : IGame
     {
         services
@@ -22,7 +23,7 @@ public static class StubbedTestHarnessExtensions
                     s.GetRequiredService<IFileSystem>(),
                     s.GetRequiredService<TemporaryFileManager>(),
                     gameFiles,
-                    stores) { WinePrefixRunner = winePrefixRunner });
+                    stores) { WinePrefixRunner = winePrefixRunner, KnownPaths = knownPaths });
 
         return services;
     }

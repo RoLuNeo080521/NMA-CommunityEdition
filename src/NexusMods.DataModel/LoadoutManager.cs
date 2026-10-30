@@ -371,6 +371,8 @@ internal partial class LoadoutManager : ILoadoutManager
                 tx.Retract(metadata, GameInstallMetadata.LastSyncedLoadoutId, metadata.LastSyncedLoadoutId.Value);
             if (metadata.Contains(GameInstallMetadata.LastSyncedLoadoutTransactionId))
                 tx.Retract(metadata, GameInstallMetadata.LastSyncedLoadoutTransactionId, metadata.LastSyncedLoadoutTransactionId.Value);
+            if (metadata.Contains(GameInstallMetadata.LastSyncedLocations))
+                tx.Retract(metadata, GameInstallMetadata.LastSyncedLocations, metadata.LastSyncedLocations.Value);
             if (metadata.Contains(GameInstallMetadata.InitialDiskStateTransactionId))
                 tx.Retract(metadata, GameInstallMetadata.InitialDiskStateTransactionId, metadata.InitialDiskStateTransactionId.Value);
             if (metadata.Contains(GameInstallMetadata.LastScannedDiskStateTransactionId))

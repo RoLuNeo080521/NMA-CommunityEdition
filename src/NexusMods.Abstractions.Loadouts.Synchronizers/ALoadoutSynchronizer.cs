@@ -336,7 +336,43 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         var currentItems = GetDiskStateForGame(metadata);
         var prevItems = ((ILoadoutSynchronizer)this).GetPreviouslyAppliedDiskState(metadata);
         
-        return BuildSyncTree(currentItems, prevItems, loadout);
+        var syncTree = BuildSyncTree(currentItems, prevItems, loadout);
+        AdaptToMovedLocations(syncTree, loadout, metadata, prevItems);
+        return syncTree;
+    }
+
+    /// <summary>
+    /// Makes the previously applied state of the game locations that moved since the last applied loadout describe
+    /// their new place. See <see cref="MovedGameLocations"/>.
+    /// </summary>
+    private void AdaptToMovedLocations(Dictionary<GamePath, SyncNode> syncTree, Loadout.ReadOnly loadout, GameInstallMetadata.ReadOnly metadata, IEnumerable<PathPartPair> previousDiskState)
+    {
+        if (!metadata.Contains(GameInstallMetadata.LastSyncedLoadout)) return;
+
+        var installation = loadout.InstallationInstance;
+        var lastSyncedLocations = GameInstallMetadata.LastSyncedLocations.TryGetValue(metadata, out var locations) ? MovedGameLocations.Parse(locations) : null;
+        var movedLocations = MovedGameLocations.Find(lastSyncedLocations, installation.Locations, () => GetLocationsBeforeWinePrefix(installation), previousDiskState);
+        if (movedLocations.Count == 0) return;
+
+        Logger.LogInformation("The game locations {Locations} moved since the last applied loadout: the files of the loadout go to their new place", string.Join(", ", movedLocations));
+        MovedGameLocations.Adapt(syncTree, movedLocations);
+    }
+
+    /// <summary>
+    /// The game locations as NMA resolved them before 1.3.0: with the file system of the Linux user, outside the Wine
+    /// prefix of the game.
+    /// </summary>
+    private IReadOnlyDictionary<LocationId, AbsolutePath> GetLocationsBeforeWinePrefix(GameInstallation installation)
+    {
+        try
+        {
+            return installation.Game.GetLocations(FileSystem.Shared, installation.LocatorResult);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "Couldn't resolve the game locations outside the Wine prefix");
+            return new Dictionary<LocationId, AbsolutePath>();
+        }
     }
 
     /// <summary>
@@ -515,6 +551,7 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         
         tx.Add(gameMetadataId, Sdk.Games.GameInstallMetadata.LastSyncedLoadout, loadout.Id);
         tx.Add(gameMetadataId, Sdk.Games.GameInstallMetadata.LastSyncedLoadoutTransaction, EntityId.From(tx.ThisTxId.Value));
+        tx.Add(gameMetadataId, Sdk.Games.GameInstallMetadata.LastSyncedLocations, MovedGameLocations.Serialize(loadout.InstallationInstance.Locations));
         tx.Add(gameMetadataId, Sdk.Games.GameInstallMetadata.LastScannedDiskStateTransaction, EntityId.From(tx.ThisTxId.Value));
         tx.Add(loadout.Id, Loadout.LastAppliedDateTime, DateTime.UtcNow);
         await tx.Commit();
@@ -1169,6 +1206,7 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     public bool ShouldSynchronize(Loadout.ReadOnly loadout, IEnumerable<PathPartPair> previousDiskState, IEnumerable<PathPartPair> lastScannedDiskState)
     {
         var syncTree = BuildSyncTree(lastScannedDiskState, previousDiskState, loadout);
+        AdaptToMovedLocations(syncTree, loadout, GameInstallMetadata.Load(Connection.Db, loadout.InstallationId), previousDiskState);
         // Process the sync tree to get the actions populated in the nodes
         ProcessSyncTree(syncTree);
         
@@ -1179,6 +1217,7 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     public FileDiffTree LoadoutToDiskDiff(Loadout.ReadOnly loadout, List<PathPartPair> previousDiskState, List<PathPartPair> lastScannedDiskState)
     {
         var syncTree = BuildSyncTree(lastScannedDiskState, previousDiskState, loadout);
+        AdaptToMovedLocations(syncTree, loadout, GameInstallMetadata.Load(Connection.Db, loadout.InstallationId), previousDiskState);
         // Process the sync tree to get the actions populated in the nodes
         ProcessSyncTree(syncTree);
 

@@ -49,6 +49,12 @@ public partial class GameInstallMetadata : IModelDefinition
     public static readonly ReferenceAttribute<Transaction> LastSyncedLoadoutTransaction = new(Namespace, nameof(LastSyncedLoadoutTransaction)) { IsOptional = true };
 
     /// <summary>
+    /// Where the game locations were when the last loadout was applied, one <c>location=path</c> per line. The
+    /// synchronizer compares them with the current locations to find the ones that moved.
+    /// </summary>
+    public static readonly StringAttribute LastSyncedLocations = new(Namespace, nameof(LastSyncedLocations)) { IsOptional = true };
+
+    /// <summary>
     /// The 'AsOf' transaction ID of the initial disk state when the game folder was first indexed
     /// </summary>
     public static readonly ReferenceAttribute<Transaction> InitialDiskStateTransaction = new(Namespace, nameof(InitialDiskStateTransaction)) { IsOptional = true };
