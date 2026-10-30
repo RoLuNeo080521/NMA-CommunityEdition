@@ -27,6 +27,12 @@ public class RedModInstaller : ALibraryArchiveInstaller
     
     private static readonly RelativePath InfoJson = "info.json";
     private static readonly RelativePath Mods = "mods";
+
+    // Folders of the game for the other kinds of mods: an info.json there isn't a REDmod manifest
+    private static readonly RelativePath[] GameFolders = ["bin", "engine", "r6", "red4ext", "archive"];
+
+    // The script that Cyber Engine Tweaks runs for its mods
+    private static readonly RelativePath CetModScript = "init.lua";
     private readonly IFileStore _fileStore;
     
     private async Task<RedModInfo?> ReadInfoJson(Hash hash, IStreamFactory? streamFactory = null)
@@ -58,10 +64,13 @@ public class RedModInstaller : ALibraryArchiveInstaller
     {
         var tree = LibraryArchiveTreeExtensions.GetTree(libraryArchive);
         var infosList = new List<(KeyedBox<RelativePath, LibraryArchiveTree>  File, RedModInfo InfoJson)>();
+        var archivePaths = tree.GetFiles().Select(f => f.Item.Path).ToHashSet();
         
         foreach (var f in tree.GetFiles())
         {
             if (f.Key().FileName != InfoJson)
+                continue;
+            if (!IsRedModManifest(f.Item.Path, archivePaths))
                 continue;
 
             var infoJson = await ReadInfoJson(f.Item.LibraryFile.Value.Hash);
@@ -94,6 +103,18 @@ public class RedModInstaller : ALibraryArchiveInstaller
         }
 
         return new Success();
+    }
+
+    /// <summary>
+    /// Other mods ship an info.json too, like the Cyber Engine Tweaks mods, in
+    /// bin/x64/plugins/cyber_engine_tweaks/mods/&lt;mod&gt; next to their init.lua. A REDmod manifest isn't in the game
+    /// folders of the other kinds of mods, nor next to an init.lua.
+    /// </summary>
+    internal static bool IsRedModManifest(RelativePath infoJsonPath, IReadOnlySet<RelativePath> archivePaths)
+    {
+        var modFolder = infoJsonPath.Parent;
+        if (modFolder.Parts.Any(part => GameFolders.Contains(part))) return false;
+        return !archivePaths.Contains(modFolder.Join(CetModScript));
     }
 }
 
