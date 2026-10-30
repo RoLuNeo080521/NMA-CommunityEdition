@@ -1,5 +1,4 @@
 using CliWrap;
-using CliWrap.Builders;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using NexusMods.Abstractions.Loadouts;
@@ -46,6 +45,8 @@ public class RedModDeployToolWineTests : AIsolatedGameTest<RedModDeployToolWineT
 
     private AbsolutePath PrefixLoadOrderFile => _winePrefixRunner.WinePrefixDirectoryPath.Combine("drive_c/modlist.txt");
 
+    private AbsolutePath DeployScript => _winePrefixRunner.WinePrefixDirectoryPath.Combine("drive_c/redmod-deploy.bat");
+
     [Fact]
     public async Task RunsRedModInThePrefixOfTheGame()
     {
@@ -57,13 +58,13 @@ public class RedModDeployToolWineTests : AIsolatedGameTest<RedModDeployToolWineT
         var gameFolder = GameInstallation.Locations.ToAbsolutePath(new GamePath(LocationId.Game, RelativePath.Empty));
         var command = _winePrefixRunner.RunCommand;
         command.Should().NotBeNull();
-        command!.TargetFilePath.Should().Be(redMod.ToString());
-        // The game folder of the test is outside the prefix: redmod sees it through Z:
-        command.Arguments.Should().Be(new ArgumentsBuilder()
-            .Add(["deploy", "-force", "-modlist=C:\\modlist.txt", "-root=Z:" + gameFolder.ToString().Replace('/', '\\')])
-            .Build());
-        command.WorkingDirPath.Should().Be(redMod.Parent.ToString());
+        command!.TargetFilePath.Should().Be(DeployScript.ToString());
+        command.WorkingDirPath.Should().Be(gameFolder.ToString());
         PrefixLoadOrderFile.FileExists.Should().BeTrue();
+
+        // The game folder of the test is outside the prefix: redmod sees it through Z:
+        var root = "Z:" + gameFolder.ToString().Replace('/', '\\');
+        (await DeployScript.ReadAllTextAsync()).Should().Contain($"\"Z:{redMod.ToString().Replace('/', '\\')}\" deploy -force -modlist=C:\\modlist.txt -root=\"{root}\"");
     }
 
     [Fact]
@@ -76,6 +77,7 @@ public class RedModDeployToolWineTests : AIsolatedGameTest<RedModDeployToolWineT
 
         _winePrefixRunner.RunCommand.Should().NotBeNull();
         PrefixLoadOrderFile.FileExists.Should().BeFalse();
+        DeployScript.FileExists.Should().BeFalse();
     }
 
     private sealed class RecordingWinePrefixRunner : IWinePrefixRunner
@@ -113,5 +115,29 @@ public class RedModWinePathTests
         var gameFolder = FileSystem.Shared.FromUnsanitizedFullPath("/home/user/Games/Heroic/Cyberpunk 2077");
 
         RedModDeployTool.ToWinePath(gameFolder, Prefix).Should().Be(@"Z:\home\user\Games\Heroic\Cyberpunk 2077");
+    }
+
+    [Fact]
+    public async Task DeployScript_RunsRedModWithTheQuotedRoot()
+    {
+        // redmod ignores "-root=<folder>": the quotes must come after the =
+        var prefix = FileSystem.Shared.GetKnownPath(KnownPath.TempDirectory).Combine($"redmod-script-{Guid.NewGuid():N}");
+        try
+        {
+            var gameFolder = prefix.Combine("drive_c/GOG Games/Cyberpunk 2077");
+
+            var script = await RedModDeployTool.WriteDeployScript(prefix, gameFolder, gameFolder.Combine("tools/redmod/bin/redMod.exe"), CancellationToken.None);
+
+            script.Should().Be(prefix.Combine("drive_c/redmod-deploy.bat"));
+            (await script.ReadAllTextAsync()).Should().Be(
+                "@echo off\r\n" +
+                "cd /d \"C:\\GOG Games\\Cyberpunk 2077\"\r\n" +
+                "\"C:\\GOG Games\\Cyberpunk 2077\\tools\\redmod\\bin\\redMod.exe\" deploy -force -modlist=C:\\modlist.txt -root=\"C:\\GOG Games\\Cyberpunk 2077\"\r\n" +
+                "exit /b %ERRORLEVEL%\r\n");
+        }
+        finally
+        {
+            if (prefix.DirectoryExists()) prefix.DeleteDirectory(recursive: true);
+        }
     }
 }
