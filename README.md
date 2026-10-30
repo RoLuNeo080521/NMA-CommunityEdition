@@ -25,6 +25,8 @@ Nexus Mods [paused the Nexus Mods App](https://help.nexusmods.com/article/164-di
 - **Game versions newer than the Nexus file database** (for example Cyberpunk 2077 2.5) are handled safely. NMA takes the game folder as it first indexed it as the original game files, so "Clean folder" no longer deletes the game.
 - **Fallout 4 end to end**, F4SE included, on Steam through Proton.
 - **Files in the Wine prefix**: for a game run with Proton, Heroic or Lutris, NMA puts what the game reads from AppData and Documents in the game's Wine prefix, where the game looks for it: the plugins.txt of Skyrim and Fallout 4, the mods of Baldur's Gate 3.
+- **REDmod with every Linux launcher**: NMA deploys the REDmods of Cyberpunk 2077 installed with Steam, Heroic or Lutris, in the game's Wine prefix, and tells you when REDmod fails.
+- **Cyberpunk 2077 mods where they belong**: Cyber Engine Tweaks mods go to the Cyber Engine Tweaks mods folder, even when they ship an `info.json` or are packed without their game path.
 - **The Play button follows the running game** on Linux, through launcher-to-game hand-offs.
 - **No telemetry.** No diagnostic or usage data is sent to Nexus Mods. The app identifies itself as NMA Community Edition to the Nexus Mods API.
 - **A missing game no longer breaks the app.** If a managed game is uninstalled or moved, its loadouts are hidden until the game is found again.
@@ -37,7 +39,7 @@ The [release notes](../../releases) list every change.
 
 | Game | Notes |
 |---|---|
-| Cyberpunk 2077 | REDmod load order |
+| Cyberpunk 2077 | REDmod load order and deployment |
 | Stardew Valley | SMAPI mods |
 | Skyrim Special Edition | SKSE launch |
 | Fallout 4 | F4SE launch |
