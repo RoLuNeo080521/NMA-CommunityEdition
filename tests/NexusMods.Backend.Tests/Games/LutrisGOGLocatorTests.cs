@@ -1,3 +1,4 @@
+using CliWrap;
 using Microsoft.Extensions.Logging.Abstractions;
 using NexusMods.Backend.Games.Locators;
 using NexusMods.Paths;
@@ -46,13 +47,15 @@ public class LutrisGOGLocatorTests : IDisposable
 
     private AbsolutePath PrefixFolder => _home.Combine("Games/cyberpunk-2077/pfx");
 
-    private async Task WriteGameConfig(string gamesDirectory, string service = "gog", bool withPrefix = true)
+    private async Task WriteGameConfig(string gamesDirectory, string service = "gog", bool withPrefix = true, string? wineVersion = null)
     {
         var gamesDir = _home.Combine(gamesDirectory);
         gamesDir.CreateDirectory();
         var prefix = withPrefix ? $"prefix: {PrefixFolder}" : "";
+        var wine = wineVersion is null ? "" : $"wine: {{ version: {wineVersion} }}";
         await gamesDir.Combine("cyberpunk-2077-1729000000.yml").WriteAllTextAsync(
             $"""
+            {wine}
             game:
               exe: {GameFolder}/bin/x64/Cyberpunk2077.exe
               {prefix}
@@ -142,6 +145,54 @@ public class LutrisGOGLocatorTests : IDisposable
 
         await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
             .IsEqualTo(_fileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory));
+    }
+
+    private async Task<AbsolutePath> WriteLutrisWineBuild(string version)
+    {
+        var wine = _home.Combine($".local/share/lutris/runners/wine/{version}/bin/wine");
+        wine.Parent.CreateDirectory();
+        await wine.WriteAllTextAsync("");
+        return wine;
+    }
+
+    private static Command RedModCommand => Cli.Wrap("/games/Cyberpunk 2077/tools/redmod/bin/redMod.exe").WithArguments("deploy");
+
+    [Test]
+    public async Task Test_RunsToolsWithTheWineVersionOfAllTheGames()
+    {
+        var wine = await WriteLutrisWineBuild("wine-ge-8-26-x86_64");
+        await _home.Combine(".local/share/lutris/runners/wine.yml").WriteAllTextAsync("wine:\n  version: wine-ge-8-26-x86_64\n");
+        await WriteGameConfig(".local/share/lutris/games");
+        await WriteGameFiles(withGogInfo: true);
+
+        var runner = CreateLocator().Locate().Single().WinePrefixRunner;
+
+        await Assert.That(runner).IsNotNull();
+        await Assert.That(runner!.WinePrefixDirectoryPath).IsEqualTo(PrefixFolder);
+        await Assert.That(runner.MakeRunCommand(RedModCommand)?.TargetFilePath).IsEqualTo(wine.ToString());
+    }
+
+    [Test]
+    public async Task Test_RunsToolsWithTheWineVersionOfTheGame()
+    {
+        await WriteLutrisWineBuild("wine-ge-8-26-x86_64");
+        var gameWine = await WriteLutrisWineBuild("lutris-7.2-2-x86_64");
+        await _home.Combine(".local/share/lutris/runners/wine.yml").WriteAllTextAsync("wine:\n  version: wine-ge-8-26-x86_64\n");
+        await WriteGameConfig(".local/share/lutris/games", wineVersion: "lutris-7.2-2-x86_64");
+        await WriteGameFiles(withGogInfo: true);
+
+        var runner = CreateLocator().Locate().Single().WinePrefixRunner;
+
+        await Assert.That(runner?.MakeRunCommand(RedModCommand)?.TargetFilePath).IsEqualTo(gameWine.ToString());
+    }
+
+    [Test]
+    public async Task Test_WithoutPrefix_HasNoToolRunner()
+    {
+        await WriteGameConfig(".local/share/lutris/games", withPrefix: false);
+        await WriteGameFiles(withGogInfo: true);
+
+        await Assert.That(CreateLocator().Locate().Single().WinePrefixRunner).IsNull();
     }
 
     [Test]

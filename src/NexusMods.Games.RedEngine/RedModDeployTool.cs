@@ -1,4 +1,3 @@
-using System.Reflection;
 using CliWrap;
 using DynamicData.Kernel;
 using Microsoft.Extensions.Logging;
@@ -41,6 +40,7 @@ public class RedModDeployTool : ITool
     public async Task Execute(Loadout.ReadOnly loadout, CancellationToken cancellationToken)
     {
         var exe = loadout.InstallationInstance.Locations.ToAbsolutePath(RedModPath);
+        var gameFolder = loadout.InstallationInstance.Locations.ToAbsolutePath(new GamePath(LocationId.Game, RelativePath.Empty));
         var deployFolder = loadout.InstallationInstance.Locations.ToAbsolutePath(RedModDeployFolder);
 
         await using var loadorderFile = _temporaryFileManager.CreateFile();
@@ -81,26 +81,93 @@ public class RedModDeployTool : ITool
                     return;
                 }
 
-                var wineDirectory = linuxCompatibilityDataProvider.WinePrefixDirectoryPath;
-                var cDriveDirectory = wineDirectory.Combine("drive_c");
+                var winePrefixDirectory = linuxCompatibilityDataProvider.WinePrefixDirectoryPath;
+                await CopyLoadOrderToPrefix(loadorderFile.Path, winePrefixDirectory, cancellationToken);
+                var deployScript = await WriteDeployScript(winePrefixDirectory, gameFolder, exe, cancellationToken);
 
-                if (!cDriveDirectory.DirectoryExists()) cDriveDirectory.CreateDirectory();
-                var tmpFile = cDriveDirectory.Combine("modlist.txt");
-                await using (var input = loadorderFile.Path.Read())
-                await using (var output = tmpFile.Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None))
+                // GameToolRunner runs the script in the Proton prefix with protontricks-launch
+                var command = Cli.Wrap(deployScript.ToString()).WithWorkingDirectory(gameFolder.ToString());
+                await _toolRunner.ExecuteAsync(loadout, command, true, cancellationToken);
+            }
+            else if (loadout.InstallationInstance.LocatorResult.WinePrefixRunner is { } winePrefixRunner)
+            {
+                // Games installed with Heroic or Lutris: run redmod in their prefix, with the Wine or Proton build of their launcher
+                var winePrefixDirectory = winePrefixRunner.WinePrefixDirectoryPath;
+                var command = Cli.Wrap(GetDeployScriptPath(winePrefixDirectory).ToString()).WithWorkingDirectory(gameFolder.ToString());
+
+                var wineCommand = winePrefixRunner.MakeRunCommand(command);
+                if (wineCommand is null)
                 {
-                    await input.CopyToAsync(output, cancellationToken: cancellationToken);
+                    _logger.LogWarning("Skip running redmod: the Wine or Proton build the launcher runs the game with isn't installed");
+                    return;
                 }
 
-                await using var batchPath = await ExtractTemporaryDeployScript();
-                var command = Cli.Wrap(batchPath.ToString()).WithArguments(["deploy", "-force", "-modlist=C:\\modlist.txt"], escape: true);
-                await _toolRunner.ExecuteAsync(loadout, command, true, cancellationToken);
-            }            
+                await CopyLoadOrderToPrefix(loadorderFile.Path, winePrefixDirectory, cancellationToken);
+                await WriteDeployScript(winePrefixDirectory, gameFolder, exe, cancellationToken);
+                await _toolRunner.ExecuteAsync(loadout, wineCommand, true, cancellationToken);
+            }
             else
             {
-                _logger.LogWarning("Skip running redmod, it's only supported for Steam on Linux at the moment");
+                _logger.LogWarning("Skip running redmod: the Wine prefix of the game is unknown");
             }
         }
+    }
+
+    /// <summary>
+    /// The load order file in the Wine prefix, where redmod reads it.
+    /// </summary>
+    private const string PrefixLoadOrderFile = "C:\\modlist.txt";
+
+    private static AbsolutePath GetDeployScriptPath(AbsolutePath winePrefixDirectory) => winePrefixDirectory.Combine("drive_c/redmod-deploy.bat");
+
+    /// <summary>
+    /// Writes the batch file that deploys the REDmods in the Wine prefix, in its drive_c, and returns its path.
+    /// </summary>
+    /// <remarks>
+    /// redmod needs its game folder in -root="&lt;folder&gt;", with the quotes after the =. Without -root, it uses
+    /// tools\redmod\bin as the game folder. From separate arguments, Wine and Proton quote the whole argument of a
+    /// folder with spaces ("-root=&lt;folder&gt;"), which redmod ignores. Either way, it finds no mods and deploys
+    /// nothing (REDmodLog.txt: "No root specified", "Invalid root path found", "No mods found"). The batch file gives
+    /// redmod this exact command line, from the game folder.
+    /// </remarks>
+    internal static async Task<AbsolutePath> WriteDeployScript(AbsolutePath winePrefixDirectory, AbsolutePath gameFolder, AbsolutePath redModExe, CancellationToken cancellationToken)
+    {
+        var root = ToWinePath(gameFolder, winePrefixDirectory);
+        string[] lines =
+        [
+            "@echo off",
+            $"cd /d \"{root}\"",
+            $"\"{ToWinePath(redModExe, winePrefixDirectory)}\" deploy -force -modlist={PrefixLoadOrderFile} -root=\"{root}\"",
+            "exit /b %ERRORLEVEL%",
+        ];
+
+        var script = GetDeployScriptPath(winePrefixDirectory);
+        script.Parent.CreateDirectory();
+        // cmd reads batch files with Windows line breaks
+        await script.WriteAllTextAsync(string.Join("\r\n", lines) + "\r\n", cancellationToken);
+        return script;
+    }
+
+    /// <summary>
+    /// The path of <paramref name="path"/> for a program running in the Wine prefix: C:\ is its drive_c, and Z:\ the
+    /// root of the file system.
+    /// </summary>
+    internal static string ToWinePath(AbsolutePath path, AbsolutePath winePrefixDirectory)
+    {
+        var cDrive = winePrefixDirectory.Combine("drive_c");
+        return path.InFolder(cDrive)
+            ? "C:\\" + path.RelativeTo(cDrive).ToString().Replace('/', '\\')
+            : "Z:" + path.ToString().Replace('/', '\\');
+    }
+
+    private static async Task CopyLoadOrderToPrefix(AbsolutePath loadorderFilePath, AbsolutePath winePrefixDirectory, CancellationToken cancellationToken)
+    {
+        var cDriveDirectory = winePrefixDirectory.Combine("drive_c");
+        if (!cDriveDirectory.DirectoryExists()) cDriveDirectory.CreateDirectory();
+
+        await using var input = loadorderFilePath.Read();
+        await using var output = cDriveDirectory.Combine("modlist.txt").Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        await input.CopyToAsync(output, cancellationToken: cancellationToken);
     }
 
     internal async Task WriteLoadOrderFile(AbsolutePath loadorderFilePath, Loadout.ReadOnly loadout)
@@ -128,20 +195,5 @@ public class RedModDeployTool : ITool
             await Execute(loadout, cancellationToken);
             return Unit.Default;
         });
-    }
-
-    private async Task<TemporaryPath> ExtractTemporaryDeployScript()
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = "deploy_redmod.bat";
-
-        await using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
-            throw new InvalidOperationException($"Resource {resourceName} not found in assembly.");
-
-        using var reader = new StreamReader(stream);
-        var file = _temporaryFileManager.CreateFile((Extension?)".bat");
-        await file.Path.WriteAllTextAsync(await reader.ReadToEndAsync());
-        return file;
     }
 }

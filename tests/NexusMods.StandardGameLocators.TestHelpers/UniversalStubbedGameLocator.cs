@@ -14,6 +14,11 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
 
     public LocatorId[] LocatorIds { get; set; } = [LocatorId.From("StubbedGameState.zip")];
 
+    /// <summary>
+    /// The runner of the game's Windows tools, like the locators of the games installed with Heroic or Lutris give.
+    /// </summary>
+    public IWinePrefixRunner? WinePrefixRunner { get; init; }
+
     public UniversalStubbedGameLocator(
         IServiceProvider serviceProvider,
         IFileSystem fileSystem,
@@ -46,6 +51,7 @@ public class UniversalStubbedGameLocator<TGame> : IGameLocator, IDisposable
                 Store = store,
                 Path = _path,
                 StoreIdentifier = LocatorIds[0].Value,
+                WinePrefixRunner = WinePrefixRunner,
             };
         }
     }

@@ -1,3 +1,4 @@
+using CliWrap;
 using Microsoft.Extensions.Logging.Abstractions;
 using NexusMods.Backend.Games.Locators;
 using NexusMods.Paths;
@@ -47,6 +48,8 @@ public class HeroicEpicLocatorTests : IDisposable
     private HeroicEpicLocator CreateLocator(string egsIdentifier = CatalogItemId) => new([CreateGame(egsIdentifier)], NullLoggerFactory.Instance, _fileSystem);
 
     private AbsolutePath GameFolder => _home.Combine("Games/Heroic/Cyberpunk 2077");
+
+    private AbsolutePath WineBinary => _home.Combine(".config/heroic/tools/wine/Wine-GE-Proton8-26/bin/wine");
 
     private AbsolutePath PrefixFolder => _home.Combine("Games/Heroic/Prefixes/default/Cyberpunk 2077");
 
@@ -98,7 +101,7 @@ public class HeroicEpicLocatorTests : IDisposable
               "{{AppName}}": {
                 "autoInstallDxvk": true,
                 "winePrefix": "{{PrefixFolder}}",
-                "wineVersion": { "bin": "/opt/wine/bin/wine", "name": "Wine Test", "type": "{{wineType}}" }
+                "wineVersion": { "bin": "{{WineBinary}}", "name": "Wine Test", "type": "{{wineType}}" }
               },
               "version": "v0",
               "explicit": true
@@ -202,6 +205,23 @@ public class HeroicEpicLocatorTests : IDisposable
 
         await Assert.That(result.Path.FileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory))
             .IsEqualTo(_fileSystem.GetKnownPath(KnownPath.LocalApplicationDataDirectory));
+    }
+
+    [Test]
+    public async Task Test_RunsToolsWithTheWineBuildOfTheGameSettings()
+    {
+        WineBinary.Parent.CreateDirectory();
+        await WineBinary.WriteAllTextAsync("");
+        await WriteInstalledJson(NativeLegendaryDir);
+        await WriteMetadata(NativeLegendaryDir);
+        await WriteGameSettings(NativeLegendaryDir, "wine");
+
+        var runner = CreateLocator().Locate().Single().WinePrefixRunner;
+        var command = runner?.MakeRunCommand(Cli.Wrap("/games/Cyberpunk 2077/tools/redmod/bin/redMod.exe").WithArguments("deploy"));
+
+        await Assert.That(runner?.WinePrefixDirectoryPath).IsEqualTo(PrefixFolder);
+        await Assert.That(command?.TargetFilePath).IsEqualTo(WineBinary.ToString());
+        await Assert.That(command?.EnvironmentVariables["WINEPREFIX"]).IsEqualTo(PrefixFolder.ToString());
     }
 
     [Test]
