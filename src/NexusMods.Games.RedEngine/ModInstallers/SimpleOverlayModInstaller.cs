@@ -5,6 +5,7 @@ using NexusMods.Abstractions.Library.Installers;
 using NexusMods.Abstractions.Loadouts;
 using NexusMods.MnemonicDB.Abstractions;
 using NexusMods.Paths;
+using NexusMods.Paths.Trees;
 using NexusMods.Paths.Trees.Traits;
 using NexusMods.Sdk.Library;
 using NexusMods.Sdk.Games;
@@ -29,6 +30,10 @@ public class SimpleOverlayModInstaller : ALibraryArchiveInstaller
         "archive/pc/mod",
     ];
 
+    // Cyber Engine Tweaks runs the init.lua of each folder in its mods folder
+    private static readonly RelativePath CetModsFolder = "bin/x64/plugins/cyber_engine_tweaks/mods";
+    private static readonly RelativePath CetModScript = "init.lua";
+
     public override ValueTask<InstallerResult> ExecuteAsync(
         LibraryArchive.ReadOnly libraryArchive,
         LoadoutItemGroup.New loadoutGroup,
@@ -44,7 +49,21 @@ public class SimpleOverlayModInstaller : ALibraryArchiveInstaller
             .SelectMany(x => tree.FindSubPathRootsByKeyUpward(x.Parts.ToArray()))
             .ToArray();
 
-        if (roots.Length == 0) return ValueTask.FromResult<InstallerResult>(new NotSupported(Reason: "Archive contains no valid roots"));
+        // Cyber Engine Tweaks mods packed without their bin/x64/plugins/cyber_engine_tweaks/mods path: the folders with
+        // an init.lua outside the roots. A folder in another one is part of that mod.
+        var rootFolders = roots.Select(root => root.Item.Path).ToArray();
+        var cetModFolders = tree.GetFiles()
+            .Select(file => file.Item.Path)
+            .Where(path => path.FileName == CetModScript && path.Parent != RelativePath.Empty)
+            .Select(path => path.Parent)
+            .Where(folder => !rootFolders.Any(root => folder.InFolder(root)))
+            .Distinct()
+            .ToArray();
+        cetModFolders = cetModFolders
+            .Where(folder => !cetModFolders.Any(other => other != folder && folder.InFolder(other)))
+            .ToArray();
+
+        if (roots.Length == 0 && cetModFolders.Length == 0) return ValueTask.FromResult<InstallerResult>(new NotSupported(Reason: "Archive contains no valid roots"));
 
         var newFiles = 0;
 
@@ -54,9 +73,21 @@ public class SimpleOverlayModInstaller : ALibraryArchiveInstaller
         foreach (var node in roots)
         foreach (var file in node.Item.GetFiles<LibraryArchiveTree, RelativePath>())
         {
-            var fullPath = file.Item.Path;
-            var relativePath = fullPath.DropFirst(node.Depth() - 1);
+            AddFile(file.Item, file.Item.Path.DropFirst(node.Depth() - 1));
+        }
 
+        foreach (var folder in cetModFolders)
+        foreach (var file in tree.GetFiles().Where(file => file.Item.Path.InFolder(folder)))
+        {
+            AddFile(file.Item, CetModsFolder.Join(folder.FileName).Join(file.Item.Path.RelativeTo(folder)));
+        }
+
+        return newFiles == 0
+            ? ValueTask.FromResult<InstallerResult>(new NotSupported(Reason: "Found no matching files in the archive"))
+            : ValueTask.FromResult<InstallerResult>(new Success());
+
+        void AddFile(LibraryArchiveTree file, RelativePath relativePath)
+        {
             _ = new LoadoutFile.New(tx, out var id)
             {
                 LoadoutItemWithTargetPath = new LoadoutItemWithTargetPath.New(tx, id)
@@ -69,14 +100,10 @@ public class SimpleOverlayModInstaller : ALibraryArchiveInstaller
                         ParentId = loadoutGroup.Id,
                     },
                 },
-                Hash = file.Item.LibraryFile.Value.Hash,
-                Size = file.Item.LibraryFile.Value.Size,
+                Hash = file.LibraryFile.Value.Hash,
+                Size = file.LibraryFile.Value.Size,
             };
             newFiles++;
         }
-
-        return newFiles == 0
-            ? ValueTask.FromResult<InstallerResult>(new NotSupported(Reason: "Found no matching files in the archive"))
-            : ValueTask.FromResult<InstallerResult>(new Success());
     }
 }

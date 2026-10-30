@@ -1,0 +1,17 @@
+﻿[
+  {
+    FromPath: MyMod/my_mod/config.json,
+    Hash: 0xBE29DCE4058789E8,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/config.json
+  },
+  {
+    FromPath: MyMod/r6/scripts/MyMod/Core.reds,
+    Hash: 0x93E9505D59968B6A,
+    ToGamePath: {Game}/r6/scripts/MyMod/Core.reds
+  },
+  {
+    FromPath: MyMod/my_mod/init.lua,
+    Hash: 0xF0064E579A9349FB,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/my_mod/init.lua
+  }
+]

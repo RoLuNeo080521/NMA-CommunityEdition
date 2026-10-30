@@ -1,0 +1,17 @@
+﻿[
+  {
+    FromPath: bike_mode_impact_topple/info.json,
+    Hash: 0xC60F7C2602231404,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/bike_mode_impact_topple/info.json
+  },
+  {
+    FromPath: bike_mode_impact_topple/init.lua,
+    Hash: 0x19ACB9C438D7EDE8,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/bike_mode_impact_topple/init.lua
+  },
+  {
+    FromPath: bike_mode_impact_topple/modules/ui/init.lua,
+    Hash: 0xB844AD722495EAF4,
+    ToGamePath: {Game}/bin/x64/plugins/cyber_engine_tweaks/mods/bike_mode_impact_topple/modules/ui/init.lua
+  }
+]

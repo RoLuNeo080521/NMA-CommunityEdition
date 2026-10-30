@@ -95,6 +95,20 @@ public class RedModInstallerTests(ITestOutputHelper outputHelper) : ALibraryArch
         (await TryInstallRedMod(loadout, archive)).IsNotSupported(out _).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(CetMod)]
+    [InlineData("bike_mode_impact_topple")]
+    public async Task CyberEngineTweaksModWithInfoJson_TheGameInstallsItForCyberEngineTweaks(string modFolder)
+    {
+        var loadout = await CreateLoadout();
+        var archive = await AddFromFiles(($"{modFolder}/info.json", InfoJson), ($"{modFolder}/init.lua", "-- CET mod"));
+
+        // With all the installers of the game, in their order
+        var result = await LoadoutManager.InstallItem(archive.AsLibraryFile().AsLibraryItem(), loadout);
+
+        InstalledPaths(result.LoadoutItemGroup!.Value).Should().Equal($"{CetMod}/info.json", $"{CetMod}/init.lua");
+    }
+
     [Fact]
     public async Task CyberEngineTweaksModWithInfoJson_IsInstalledForCyberEngineTweaks()
     {
