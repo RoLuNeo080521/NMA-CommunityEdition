@@ -64,6 +64,7 @@ public class Cyberpunk2077Game : IGame, IGameData<Cyberpunk2077Game>
             new PatternBasedDependencyEmitter(PatternDefinitions.Definitions, provider),
             new MissingProtontricksForRedModEmitter(provider),
             new MissingRedModEmitter(),
+            new RedModDeployFailedEmitter(),
             new WinePrefixRequirementsEmitter(),
         ];
 

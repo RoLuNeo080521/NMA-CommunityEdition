@@ -283,4 +283,36 @@ The current WINE prefix does not have the required packages installed for moddin
             .AddValue<string>("Instructions")
         )
         .Finish();
+
+    [DiagnosticTemplate]
+    [UsedImplicitly]
+    internal static IDiagnosticTemplate RedModDeployFailed = DiagnosticTemplateBuilder
+        .Start()
+        .WithId(new DiagnosticId(Source, number: 9))
+        .WithTitle("REDmod failed to deploy the REDmods")
+        .WithSeverity(DiagnosticSeverity.Warning)
+        .WithSummary("REDmod failed to deploy the REDmods: {Error}")
+        .WithDetails("""
+The last time the app ran REDmod to deploy the REDmods, REDmod failed with this error: **{Error}**
+
+The REDmods of the loadout don't work in the game until REDmod deploys them.
+
+### How to Resolve
+1. Read the log of REDmod, `{LogPath}`, to find out which stage failed and why.
+2. Fix the cause, then apply the loadout again.
+
+OR
+
+1. Remove any mods requiring REDmod from Installed Mods.
+
+### Technical Details
+The app runs REDmod each time it applies a loadout with REDmods. REDmod writes `REDmodLog.txt` in its working directory, and ends it with `Commandlet deploy has failed` when the deploy fails.
+
+`Script compilation has failed` is a known issue of REDmod since Cyberpunk 2077 2.5, on Windows too: the scripts that REDmod ships in `tools/redmod/scripts` don't compile, so every deploy fails, even for REDmods without scripts. Until a game update fixes REDmod, use the versions of your mods that don't need REDmod, when they exist.
+""")
+        .WithMessageData(messageBuilder => messageBuilder
+            .AddValue<string>("Error")
+            .AddValue<string>("LogPath")
+        )
+        .Finish();
 }
