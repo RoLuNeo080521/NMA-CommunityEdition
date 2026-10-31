@@ -59,6 +59,7 @@ public class UndoService
     [
         GameInstallMetadata.LastSyncedLoadoutId,
         GameInstallMetadata.LastSyncedLoadoutTransactionId,
+        GameInstallMetadata.LastSyncedLocations,
         DiskStateEntry.GameId,
         Loadout.LastAppliedDateTime,
         ManagedCollectionLoadoutGroup.Collection,
