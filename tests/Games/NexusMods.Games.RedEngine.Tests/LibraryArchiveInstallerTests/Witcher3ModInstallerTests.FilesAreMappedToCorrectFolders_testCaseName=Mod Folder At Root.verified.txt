@@ -1,0 +1,10 @@
+﻿[
+  {
+    FromPath: modFoo/content/blob0.bundle,
+    ToGamePath: {Game}/Mods/modFoo/content/blob0.bundle
+  },
+  {
+    FromPath: modFoo/content/metadata.store,
+    ToGamePath: {Game}/Mods/modFoo/content/metadata.store
+  }
+]

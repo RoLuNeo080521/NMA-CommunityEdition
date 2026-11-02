@@ -1,0 +1,10 @@
+﻿[
+  {
+    FromPath: bin/x64_dx12/plugins/foo.asi,
+    ToGamePath: {Game}/bin/x64_dx12/plugins/foo.asi
+  },
+  {
+    FromPath: bin/x64/plugins/foo.asi,
+    ToGamePath: {Game}/bin/x64/plugins/foo.asi
+  }
+]

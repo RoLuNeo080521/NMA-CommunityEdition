@@ -1,0 +1,10 @@
+﻿[
+  {
+    FromPath: Mods/modFoo/content/blob0.bundle,
+    ToGamePath: {Game}/Mods/modFoo/content/blob0.bundle
+  },
+  {
+    FromPath: bin/config/r4game/user_config_matrix/pc/foo.xml,
+    ToGamePath: {Game}/bin/config/r4game/user_config_matrix/pc/foo.xml
+  }
+]
