@@ -31,6 +31,8 @@ public record ExperimentalSettings : ISettings
         GameId.From("CreationEngine.Fallout4"),
         GameId.From("Larian.BaldursGate3"),
         GameId.From("Bannerlord"),
+        // Added by the Community Edition fork
+        GameId.From("RedEngine.Witcher3"),
     ];
 
     public static ISettingsBuilder Configure(ISettingsBuilder settingsBuilder)
