@@ -58,7 +58,7 @@ public class RedModDeployTool : ITool
         if (fs.OS.IsWindows)
         {
             var command = Cli.Wrap(exe.ToString())
-                .WithArguments(["deploy", "-force", "-modlist=" + loadorderFile.Path], true)
+                .WithArguments(BuildDeployArguments(gameFolder, loadorderFile.Path))
                 .WithWorkingDirectory(exe.Parent.ToString());
             await _toolRunner.ExecuteAsync(loadout, command, true, cancellationToken);
         }
@@ -169,6 +169,25 @@ public class RedModDeployTool : ITool
         await using var output = cDriveDirectory.Combine("modlist.txt").Open(FileMode.Create, FileAccess.ReadWrite, FileShare.None);
         await input.CopyToAsync(output, cancellationToken: cancellationToken);
     }
+
+    /// <summary>
+    /// Builds the command line of <c>redMod.exe deploy</c> on Windows.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>-root</c> is required: since game version 2.5, without it redmod uses <c>tools\redmod\bin</c> as the game
+    /// folder, finds no mods and deploys nothing (REDmodLog.txt: "No root specified", "Invalid root path found",
+    /// "No mods found, no deployment is needed!").
+    /// </para>
+    /// <para>
+    /// The values are quoted as <c>-name="value"</c>, the form redmod documents (see <see cref="WriteDeployScript"/>).
+    /// Wrapping the whole argument in quotes (<c>"-name=value"</c>, what escaping an argument array does for a value with
+    /// spaces) is ignored by redmod: <c>-root</c> is lost, and <c>-modlist</c> silently falls back to deploying every
+    /// installed mod, without the load order.
+    /// </para>
+    /// </remarks>
+    internal static string BuildDeployArguments(AbsolutePath gameFolder, AbsolutePath modListFile)
+        => $"deploy -force -root=\"{gameFolder}\" -modlist=\"{modListFile}\"";
 
     internal async Task WriteLoadOrderFile(AbsolutePath loadorderFilePath, Loadout.ReadOnly loadout)
     {
