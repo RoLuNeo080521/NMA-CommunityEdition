@@ -185,9 +185,6 @@ public static class RunUpdateCheck
     /// </remarks>
     public static IEnumerable<IAmAModFile> GetNewerFilesForExistingFile(IAmAModFile file)
     {
-        // Get the normalized name for the current file
-        var normalizedName = FuzzySearch.NormalizeFileName(file.Name, file.Version);
-        
         // Get all other files from the same mod page
         return file.OtherFilesInSameModPage
             .Where(otherFile => 
@@ -203,9 +200,9 @@ public static class RunUpdateCheck
                 //     interpreted as a pre-release, and an item without a suffix
                 //     may be assumed as a more recent version.
                 otherFile.UploadedAt > file.UploadedAt &&
-                // Must have matching normalized name
-                FuzzySearch.NormalizeFileName(otherFile.Name, otherFile.Version)
-                    .Equals(normalizedName, StringComparison.OrdinalIgnoreCase)
+                // Must be the same file: matching normalized name, or a renamed file ("Foo" then "Foo V2")
+                // with a strictly higher version
+                FuzzySearch.IsNewerFileInSameLineage(file.Name, file.Version, otherFile.Name, otherFile.Version)
             )
             .OrderByDescending(x => x.UploadedAt);
     }
@@ -221,11 +218,9 @@ public static class RunUpdateCheck
     public static IEnumerable<NexusModsFileMetadata.ReadOnly> GetAllVersionsForExistingFile(NexusModsFileMetadata.ReadOnly file)
     {
         var mixin = new ModFileMetadataMixin(file);
-        var normalizedName = FuzzySearch.NormalizeFileName(file.Name, file.Version);
         // Collect matching versions, include current file, then sort by upload date
         return mixin.OtherFilesInSameModPage
-            .Where(f => FuzzySearch.NormalizeFileName(f.Name, f.Version)
-                .Equals(normalizedName, StringComparison.OrdinalIgnoreCase))
+            .Where(f => FuzzySearch.IsSameFileLineage(file.Name, file.Version, f.Name, f.Version))
             .Select(f => ((ModFileMetadataMixin)f).Metadata)
             .Append(file)
             .OrderBy(f => f.UploadedAt);

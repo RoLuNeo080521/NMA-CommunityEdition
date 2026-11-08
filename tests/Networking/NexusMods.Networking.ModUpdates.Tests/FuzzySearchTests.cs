@@ -96,4 +96,67 @@ public class FuzzySearchTests
         // Assert
         result.Should().Be(expected);
     }
+
+    [Theory]
+    // Version tag and punctuation dropped
+    [InlineData("Cool Widget - Extended V2", "2.0.1", "cool widget extended")]
+    [InlineData("Cool Widget (Lite) v1.3b.zip", "1.0", "cool widget lite")]
+    // Game version tag dropped
+    [InlineData("Cool Widget 1.1 for 2.50", "1.1", "cool widget")]
+    [InlineData("Cool Widget for game 2.3a", "1.0", "cool widget")]
+    // Trailing dot after a version-like token
+    [InlineData("Cool Widget - 2.31.", "0.14.0", "cool widget")]
+    // Bare numbers are kept: "Part 1" and "Part 2" are different files
+    [InlineData("Cool Widget - Part 2", "1.0", "cool widget part 2")]
+    [InlineData(null, "1.0", "")]
+    public void NormalizeFileNameLoose_ShouldDropTagsAndPunctuation(string? fileName, string version, string expected)
+    {
+        FuzzySearch.NormalizeFileNameLoose(fileName, version).Should().Be(expected);
+    }
+
+    [Theory]
+    // A file renamed between two uploads: a tag was added and the version changed
+    [InlineData("Cool Widget - Extended", "1.3.0", "Cool Widget - Extended V2", "2.0.1", true)]
+    // The game version tag changes together with the version
+    [InlineData("Cool Widget 1.0 for 2.31", "1.0", "Cool Widget 1.1 for 2.50", "1.1", true)]
+    // A trailing dot after a version-like token
+    [InlineData("Cool Widget - 2.31.", "0.14.0", "Cool Widget - 2.50.", "0.14.1", true)]
+    // Equal after the strict normalization
+    [InlineData("Cool Widget 1.0.zip", "1.0", "Cool Widget 2.0.zip", "2.0", true)]
+    // Same version number: names that only differ by a tag are different files, not a rename
+    [InlineData("Cool Widget V1", "1.0", "Cool Widget V2", "1.0", false)]
+    // Different files
+    [InlineData("Cool Widget - Part 1", "1.0", "Cool Widget - Part 2", "1.1", false)]
+    [InlineData("Cool Widget", "1.0", "Other Widget", "1.1", false)]
+    public void IsSameFileLineage_ShouldRecognizeRenamedFiles(string nameA, string versionA, string nameB, string versionB, bool expected)
+    {
+        FuzzySearch.IsSameFileLineage(nameA, versionA, nameB, versionB).Should().Be(expected);
+    }
+
+    [Theory]
+    // A renamed file needs a strictly higher version
+    [InlineData("Cool Widget - Extended", "1.3.0", "Cool Widget - Extended V2", "2.0.1", true)]
+    [InlineData("Cool Widget - Extended V2", "2.0.1", "Cool Widget - Extended", "1.3.0", false)]
+    [InlineData("Cool Widget - Extended", "1.3.0", "Cool Widget - Extended V2", "1.3.0", false)]
+    // Unrelated files are never newer versions
+    [InlineData("Cool Widget", "1.0", "Other Widget", "2.0", false)]
+    public void IsNewerFileInSameLineage_ShouldRequireAHigherVersionForRenamedFiles(string oldName, string oldVersion, string newName, string newVersion, bool expected)
+    {
+        FuzzySearch.IsNewerFileInSameLineage(oldName, oldVersion, newName, newVersion).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("1.2.10", "1.2.9", true)]
+    [InlineData("1.2.9", "1.2.10", false)]
+    [InlineData("2.0.1", "2", true)]
+    [InlineData("2.0", "2", false)]
+    [InlineData("1.0", "1.0", false)]
+    [InlineData("v2", "1.9", true)]
+    [InlineData("2.0", null, true)]
+    [InlineData("", "1.0", false)]
+    [InlineData(null, "1.0", false)]
+    public void VersionIsGreater_ShouldCompareNumericParts(string? candidate, string? baseline, bool expected)
+    {
+        FuzzySearch.VersionIsGreater(candidate, baseline).Should().Be(expected);
+    }
 }

@@ -240,4 +240,58 @@ public class GetNewerFilesSelectorTests
         result.Should().HaveCount(2);
         result.Select(f => f.Version).Should().BeEquivalentTo("10.0", "10.0.1");
     }
+
+    [Fact]
+    public void GetNewerFilesForExistingFile_ShouldFindARenamedFileWithAHigherVersion()
+    {
+        var modPage = MockModPage.Create(page =>
+        {
+            page.AddFile("Cool Widget - Extended", "1.3.0", BaseTime);
+            page.AddFile("Cool Widget - Extended V2", "2.0.1", BaseTime.AddDays(1));
+        });
+
+        var result = RunUpdateCheck.GetNewerFilesForExistingFile(modPage.Files[0]).ToArray();
+
+        result.Should().ContainSingle().Which.Version.Should().Be("2.0.1");
+    }
+
+    [Fact]
+    public void GetNewerFilesForExistingFile_ShouldFindAFileWithANewGameVersionTag()
+    {
+        var modPage = MockModPage.Create(page =>
+        {
+            page.AddFile("Cool Widget 1.0 for 2.31", "1.0", BaseTime);
+            page.AddFile("Cool Widget 1.1 for 2.50", "1.1", BaseTime.AddDays(1));
+        });
+
+        var result = RunUpdateCheck.GetNewerFilesForExistingFile(modPage.Files[0]).ToArray();
+
+        result.Should().ContainSingle().Which.Version.Should().Be("1.1");
+    }
+
+    [Fact]
+    public void GetNewerFilesForExistingFile_ShouldIgnoreARenamedFileWithoutAHigherVersion()
+    {
+        var modPage = MockModPage.Create(page =>
+        {
+            // Uploaded later, but its version is lower: not an update
+            page.AddFile("Cool Widget - Extended V2", "2.0.1", BaseTime);
+            page.AddFile("Cool Widget - Extended", "1.3.0", BaseTime.AddDays(1));
+        });
+
+        RunUpdateCheck.GetNewerFilesForExistingFile(modPage.Files[0]).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetNewerFilesForExistingFile_ShouldIgnoreVariantsWithTheSameVersion()
+    {
+        var modPage = MockModPage.Create(page =>
+        {
+            // Two variants of the mod that happen to share a version number
+            page.AddFile("Cool Widget V1", "1.0", BaseTime);
+            page.AddFile("Cool Widget V2", "1.0", BaseTime.AddDays(1));
+        });
+
+        RunUpdateCheck.GetNewerFilesForExistingFile(modPage.Files[0]).Should().BeEmpty();
+    }
 }
