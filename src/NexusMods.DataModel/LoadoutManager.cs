@@ -367,6 +367,11 @@ internal partial class LoadoutManager : ILoadoutManager
                 tx.Delete(entry, recursive: false);
             }
 
+            foreach (var updatedFile in UpdatedGameFile.FindByGame(metadata.Db, metadata))
+            {
+                tx.Delete(updatedFile, recursive: false);
+            }
+
             if (metadata.Contains(GameInstallMetadata.LastSyncedLoadoutId))
                 tx.Retract(metadata, GameInstallMetadata.LastSyncedLoadoutId, metadata.LastSyncedLoadoutId.Value);
             if (metadata.Contains(GameInstallMetadata.LastSyncedLoadoutTransactionId))
