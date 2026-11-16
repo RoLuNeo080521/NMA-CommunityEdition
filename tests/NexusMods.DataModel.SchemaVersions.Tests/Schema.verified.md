@@ -3,9 +3,9 @@ This schema is written to a markdown file for both documentation and validation 
 models in the app, then validate the tests to update this file. 
 
 ## Statistics
-   - Fingerprint: 0xC8C8923BEDC2498F
-   - Total attributes: 233
-   - Total namespaces: 75
+   - Fingerprint: 0x7330D9CBDD0E1448
+   - Total attributes: 238
+   - Total namespaces: 76
    
 ## Attributes
 | AttributeId                                                                        | Type                    | Indexed | Many  | NoHistory | 
@@ -127,6 +127,11 @@ models in the app, then validate the tests to update this file.
 | NexusMods.Loadouts.SortOrder/SortOrderTypeId                                       | UInt128                 | False   | False | False     | 
 | NexusMods.Loadouts.SortableEntry/ParentSortOrder                                   | Reference               | True    | False | False     | 
 | NexusMods.Loadouts.SortableEntry/SortIndex                                         | Int32                   | False   | False | False     | 
+| NexusMods.Loadouts.UpdatedGameFile/Game                                            | Reference               | False   | False | False     | 
+| NexusMods.Loadouts.UpdatedGameFile/Hash                                            | UInt64                  | False   | False | False     | 
+| NexusMods.Loadouts.UpdatedGameFile/Path                                            | Tuple3_Ref_UShort_Utf8I | False   | False | False     | 
+| NexusMods.Loadouts.UpdatedGameFile/Removed                                         | Null                    | False   | False | False     | 
+| NexusMods.Loadouts.UpdatedGameFile/Size                                            | UInt64                  | False   | False | False     | 
 | NexusMods.ManagedCollectionLoadoutGroup/Collection                                 | Reference               | True    | False | False     | 
 | NexusMods.ManagedCollectionLoadoutGroup/CurrentRevisionId                          | UInt64                  | False   | False | False     | 
 | NexusMods.ManagedCollectionLoadoutGroup/CurrentRevisionNumber                      | UInt64                  | False   | False | False     | 
