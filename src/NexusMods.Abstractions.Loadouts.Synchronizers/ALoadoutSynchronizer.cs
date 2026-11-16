@@ -14,6 +14,7 @@ using NexusMods.Abstractions.Loadouts.Sorting;
 using NexusMods.Abstractions.Loadouts.Synchronizers.Rules;
 using NexusMods.Hashing.xxHash3;
 using NexusMods.MnemonicDB.Abstractions;
+using NexusMods.MnemonicDB.Abstractions.ElementComparers;
 using NexusMods.MnemonicDB.Abstractions.IndexSegments;
 using NexusMods.MnemonicDB.Abstractions.Query;
 using NexusMods.MnemonicDB.Abstractions.TxFunctions;
@@ -1072,7 +1073,9 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
         loadout = await ClearDeletedFileMarkersOfReenabledFiles(loadout);
 
         // Update locator IDs before building the sync tree
+        var previousLocatorIds = loadout.LocatorIds.ToHashSet();
         loadout = await UpdateLocatorIds(loadout);
+        if (!previousLocatorIds.SetEquals(loadout.LocatorIds)) await AdoptGameUpdate(loadout);
         
         // If we are swapping loadouts, then we need to synchronize the previous loadout first to ingest
         // any changes, then we can apply the new loadout.
@@ -1601,7 +1604,7 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
     {
         if (!GameInstallMetadata.InitialDiskStateTransaction.TryGetValue(metadata, out var initialTx)) return [];
 
-        return _initialStateGameFiles.GetOrAdd(initialTx, tx =>
+        var initialFiles = _initialStateGameFiles.GetOrAdd(initialTx, tx =>
         {
             var initialDb = Connection.AsOf(TxId.From(tx.Value));
             var files = DiskStateEntry.FindByGame(initialDb, metadata.Id)
@@ -1611,6 +1614,105 @@ public partial class ALoadoutSynchronizer : ILoadoutSynchronizer
             Logger.LogInformation("The file hashes database doesn't know the game version installed at `{Path}`: using the {Count} files of the folder as first indexed as the original game files", metadata.Path, files.Length);
             return files;
         });
+
+        // The store updated the game since: the files the updates added, changed or removed win
+        var updatedFiles = UpdatedGameFile.FindByGame(metadata.Db, metadata.Id);
+        if (updatedFiles.Count == 0) return initialFiles;
+
+        var originalFiles = initialFiles.ToDictionary(file => file.Path);
+        foreach (var updatedFile in updatedFiles)
+        {
+            GamePath path = updatedFile.Path;
+            if (updatedFile.IsRemoved) originalFiles.Remove(path);
+            else originalFiles[path] = (path, updatedFile.Hash.Value, updatedFile.Size.Value);
+        }
+
+        return originalFiles.Values.ToArray();
+    }
+
+    /// <summary>
+    /// The store updated the game to a version the file hashes database doesn't know: the files the update added,
+    /// changed or removed in the game folder become original game files, instead of changes of the user that resetting
+    /// the game to its original state would undo, by deleting what the update added. These are the files of the game
+    /// folder that no item of the loadout applied on disk owns and that differ from the original game files.
+    /// </summary>
+    private async Task AdoptGameUpdate(Loadout.ReadOnly loadout)
+    {
+        if (_fileHashService.KnowsGameFiles((loadout.Installation.Store, loadout.LocatorIds.ToArray()))) return;
+
+        var metadata = await ReindexState(loadout.InstallationInstance);
+
+        // The files of the loadout applied on disk, which can be another loadout than the one to apply
+        HashSet<GamePath> ownedPaths = [];
+        if (GameInstallMetadata.LastSyncedLoadout.TryGetValue(metadata, out var appliedLoadoutId))
+        {
+            var appliedLoadout = Loadout.Load(metadata.Db, appliedLoadoutId);
+            if (appliedLoadout.IsValid())
+            {
+                ownedPaths.UnionWith(LoadoutItem.FindByLoadout(metadata.Db, appliedLoadout).OfTypeLoadoutItemWithTargetPath().Select(item => (GamePath)item.TargetPath));
+                ownedPaths.UnionWith(IntrinsicFiles(appliedLoadout).Keys);
+            }
+        }
+
+        var originalFiles = GetInitialStateGameFiles(metadata).Where(file => file.Path.LocationId == LocationId.Game).ToDictionary(file => file.Path);
+        var diskFiles = GetDiskStateForGame(metadata).Where(file => file.Path.LocationId == LocationId.Game).ToDictionary(file => file.Path, file => file.Part);
+        var updatedFiles = UpdatedGameFile.FindByGame(metadata.Db, metadata.Id).ToDictionary(file => (GamePath)file.Path);
+
+        using var tx = Connection.BeginTransaction();
+        var changes = 0;
+
+        foreach (var (path, part) in diskFiles)
+        {
+            if (ownedPaths.Contains(path)) continue;
+            if (originalFiles.TryGetValue(path, out var originalFile) && originalFile.Hash == part.Hash) continue;
+
+            if (updatedFiles.TryGetValue(path, out var updatedFile))
+            {
+                tx.Add(updatedFile, UpdatedGameFile.Hash, part.Hash);
+                tx.Add(updatedFile, UpdatedGameFile.Size, part.Size);
+                if (updatedFile.IsRemoved) tx.Retract(updatedFile, UpdatedGameFile.Removed, Null.Instance);
+            }
+            else
+            {
+                _ = new UpdatedGameFile.New(tx)
+                {
+                    Path = path.ToGamePathParentTuple(metadata.Id),
+                    Hash = part.Hash,
+                    Size = part.Size,
+                    GameId = metadata.Id,
+                };
+            }
+
+            changes++;
+        }
+
+        foreach (var path in originalFiles.Keys)
+        {
+            if (ownedPaths.Contains(path) || diskFiles.ContainsKey(path)) continue;
+
+            if (updatedFiles.TryGetValue(path, out var updatedFile))
+            {
+                if (updatedFile.Hash.HasValue) tx.Retract(updatedFile, UpdatedGameFile.Hash, updatedFile.Hash.Value);
+                if (updatedFile.Size.HasValue) tx.Retract(updatedFile, UpdatedGameFile.Size, updatedFile.Size.Value);
+                tx.Add(updatedFile, UpdatedGameFile.Removed, Null.Instance);
+            }
+            else
+            {
+                _ = new UpdatedGameFile.New(tx)
+                {
+                    Path = path.ToGamePathParentTuple(metadata.Id),
+                    IsRemoved = true,
+                    GameId = metadata.Id,
+                };
+            }
+
+            changes++;
+        }
+
+        if (changes == 0) return;
+
+        Logger.LogInformation("The store updated the game installed at `{Path}` to a version the file hashes database doesn't know: {Count} files it added, changed or removed become original game files", metadata.Path, changes);
+        await tx.Commit();
     }
 
     private static VanityVersion? TryReadPrimaryFileVersion(GameInstallation installation)
