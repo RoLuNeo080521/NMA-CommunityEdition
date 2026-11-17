@@ -23,6 +23,28 @@ Instructions pour Claude Code (et tout contributeur) travaillant sur ce dépôt.
 - Les projets ciblent `net10.0` (`Directory.Build.props`). `global.json` demande un SDK ≥ 10.0.100
   (`rollForward: latestMajor`) et fait tourner `dotnet test` sur Microsoft.Testing.Platform (voir « Tests »).
 
+## Vortex comme référence
+
+[Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex), l'autre gestionnaire de mods de
+Nexus Mods (Electron/TypeScript), sert de référence sur les jeux. Il est sous GPL-3.0, comme
+NMA : on peut adapter sa logique en C#, en citant le fichier d'origine dans le commit ou un
+commentaire. On y reprend ce qu'il sait des jeux, pas son code tel quel.
+
+```bash
+# En lecture seule, hors de ce dépôt. GIT_LFS_SKIP_SMUDGE : le proxy de
+# l'environnement cloud ne sert pas Git LFS.
+GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 \
+  https://github.com/Nexus-Mods/vortex ../nexus-mods/vortex
+```
+
+- `extensions/games/game-<jeu>/` : identifiants de magasin, installateurs,
+  ordre de chargement et outils de 86 jeux, dont The Witcher 3, Baldur's Gate 3,
+  Fallout 4 et Skyrim. L'extension Cyberpunk 2077 y est minimale.
+- `src/renderer/src/extensions/nexus_integration/util/graphQueries.ts` :
+  les requêtes GraphQL de Nexus Mods, dont `modRequirements`.
+- `src/renderer/src/util/linux/` : la détection de Proton et des dossiers
+  de Steam sous Linux.
+
 ## Build
 
 Le build échoue sans :
