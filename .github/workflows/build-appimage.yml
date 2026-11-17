@@ -7,6 +7,9 @@ name: Build AppImage
 on:
   push:
     branches: [ "**" ]
+  # The pushes above don't cover pull requests from forks: build their AppImage too, to test them by hand. Their runs get
+  # a read-only token and no secrets, and GitHub can ask a maintainer to approve them (Settings > Actions > General).
+  pull_request:
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -43,6 +46,8 @@ env:
 
 jobs:
   build-appimage:
+    # The push of a branch of this repository already builds its pull request
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
