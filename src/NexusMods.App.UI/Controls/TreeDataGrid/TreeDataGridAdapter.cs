@@ -243,8 +243,7 @@ public abstract class TreeDataGridAdapter<TModel, TKey> : ReactiveR3Object, ISea
         if (e.TargetRow.Model is not TModel targetModel) return;
 
         // extract the source models from the event args
-        var dataObject = e.Inner.Data as DataObject;
-        if (dataObject?.Get("TreeDataGridDragInfo") is not DragInfo dragInfo) return;
+        if (GetDragInfo(e) is not { } dragInfo) return;
 
         var source = dragInfo.Source;
         var indices = dragInfo.Indexes;
@@ -263,6 +262,19 @@ public abstract class TreeDataGridAdapter<TModel, TKey> : ReactiveR3Object, ISea
     }
 
     /// <summary>
+    /// The rows being dragged. TreeDataGrid 11.1.1, its last version without a license key, starts row drags with
+    /// a legacy <see cref="DataObject"/>: for a drag within the app, <see cref="DragEventArgs.Data"/> returns that
+    /// same object.
+    /// </summary>
+    private static DragInfo? GetDragInfo(TreeDataGridRowDragEventArgs e)
+    {
+        // DataObject and DragEventArgs.Data are obsolete since Avalonia 11.3.7, in favor of DataTransfer
+#pragma warning disable CS0618
+        return (e.Inner.Data as DataObject)?.Get("TreeDataGridDragInfo") as DragInfo;
+#pragma warning restore CS0618
+    }
+
+    /// <summary>
     /// Called when one or more dragged rows are dropped.
     /// This is only called if <see cref="TreeDataGridViewHelper.SetupTreeDataGridAdapter"/> enableDragAndDrop parameter is set to true.
     /// </summary>
@@ -276,8 +288,7 @@ public abstract class TreeDataGridAdapter<TModel, TKey> : ReactiveR3Object, ISea
         if (e.TargetRow.Model is not TModel targetModel) return;
 
         // extract the source models from the event args
-        var dataObject = e.Inner.Data as DataObject;
-        if (dataObject?.Get("TreeDataGridDragInfo") is not DragInfo dragInfo) return;
+        if (GetDragInfo(e) is not { } dragInfo) return;
 
         var source = dragInfo.Source;
         var indices = dragInfo.Indexes;
