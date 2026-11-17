@@ -107,9 +107,12 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 ## CI (GitHub Actions)
 
-- `build-appimage.yml` : à chaque push (toutes branches), à la demande, et appelé par `release.yaml`.
-  Publie l'artifact `nma-appimage`.
-- `tests.yml` : à chaque push qui touche au code, avec la commande ci-dessus (plus `--timeout 20m`).
+- `build-appimage.yml` : à chaque push (toutes branches), pour les PR venant d'un fork, à la demande, et appelé
+  par `release.yaml`. Publie l'artifact `nma-appimage`.
+- `tests.yml` : à chaque push qui touche au code et pour les PR venant d'un fork, avec la commande ci-dessus (plus
+  `--timeout 20m`).
+- Les deux sautent les PR d'une branche du dépôt, déjà couvertes par le push de la branche. Sur une PR venant d'un
+  fork, ils testent la PR fusionnée dans `main`, avec un jeton en lecture seule et sans secrets.
 - `tests.yml` utilise le SDK .NET 10 de l'image `ubuntu-latest`. `build-appimage.yml` installe d'abord le
   dernier SDK 10 avec `actions/setup-dotnet` : l'AppImage embarque le runtime que connaît ce SDK, et celui de
   l'image a souvent quelques correctifs de retard. Si le CDN de Microsoft échoue (erreurs 409 déjà vues), il
@@ -117,6 +120,8 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 - `labels.yml` : crée ou met à jour les labels de `.github/labels.json` quand ce fichier change sur `main`, ou
   à la demande. Un label utilisé par un modèle d'issue, dependabot ou un workflow doit y figurer : sinon les
   modèles d'issues et dependabot l'ignorent.
+- `stale.yaml` : chaque jour, marque « Stale » les issues et les PR étiquetées `needs-response` sans activité
+  depuis 7 jours, et ferme ces issues 14 jours plus tard. Il ne ferme jamais de PR.
 - `vulnerable-packages.yml` : chaque lundi et à la demande, échoue si un paquet NuGet, direct ou indirect, a une
   vulnérabilité connue (`dotnet list package --vulnerable --include-transitive`). Dependabot ne voit pas les
   dépendances indirectes.
