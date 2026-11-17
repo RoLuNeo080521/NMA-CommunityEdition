@@ -40,7 +40,8 @@ public class Witcher3ModInstallerTests(ITestOutputHelper outputHelper) : ALibrar
         var archive = await AddFromPaths(archivePaths);
         var group = await Install(typeof(Witcher3ModInstaller), loadout, archive);
 
-        await Verify(ChildrenFilesAndHashes(group).Select(row => new
+        // Sorted: files with the same name (foo.asi) otherwise come in an order that differs between machines
+        await Verify(ChildrenFilesAndHashes(group).OrderBy(row => row.FromPath.ToString(), StringComparer.Ordinal).Select(row => new
         {
             FromPath = row.FromPath.ToString(),
             ToGamePath = row.GamePath.ToString(),
