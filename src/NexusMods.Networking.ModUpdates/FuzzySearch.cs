@@ -51,7 +51,86 @@ public static class FuzzySearch
         // Convert to lowercase for case-insensitive comparison
         return result.ToLowerInvariant();
     }
-    
+
+    // Tokens that look like a version tag: "v2", "v1.3", "v1_3b", "2.0.1", "2.31.". Bare numbers such as "2" are
+    // kept, so that "Part 1" and "Part 2" stay different files.
+    private static readonly Regex VersionLikeToken = new(@"^(v\d+([._]\d+)*[a-z]?|\d+([._]\d+)+[a-z]?)\.?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // "for 2.50", "for game 2.3a", "for v2.1": tags that authors add to a file name after a game update.
+    private static readonly Regex GameVersionTag = new(@"\bfor\s+(game\s+)?v?\d+([._]\d+)*[a-z]?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// A looser normalization than <see cref="NormalizeFileName"/> for the same file renamed between two uploads. On top
+    /// of it, this drops version-like tags ("V2", "v1.3"), game version tags ("for 2.50") and punctuation, so that
+    /// "Foo - Bar" and "Foo - Bar V2" end up the same.
+    /// </summary>
+    public static string NormalizeFileNameLoose(string? fileName, string? version)
+    {
+        var strict = NormalizeFileName(fileName, version);
+        strict = GameVersionTag.Replace(strict, " ");
+
+        var tokens = strict
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            // A lone "v" is what is left of "v1.2.3" once the version number itself was stripped
+            .Where(t => !VersionLikeToken.IsMatch(t) && !t.Equals("v", StringComparison.OrdinalIgnoreCase))
+            .Select(t => new string(t.Where(char.IsLetterOrDigit).ToArray()))
+            .Where(t => t.Length > 0);
+        return string.Join(" ", tokens);
+    }
+
+    /// <summary>
+    /// Whether two files of the same mod page are versions of the same file: their normalized names are equal or, when
+    /// their version numbers differ, their loosely normalized names are equal (the file was renamed, as in
+    /// "Foo" then "Foo V2").
+    /// </summary>
+    public static bool IsSameFileLineage(string? nameA, string? versionA, string? nameB, string? versionB)
+    {
+        if (NormalizeFileName(nameA, versionA).Equals(NormalizeFileName(nameB, versionB), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // The loose match is only trusted when the version numbers differ: two files with the same version number and
+        // names that only differ by a tag ("Foo V1", "Foo V2") are different files, not a rename.
+        if (string.Equals(versionA?.Trim(), versionB?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var looseA = NormalizeFileNameLoose(nameA, versionA);
+        return looseA.Length > 0 && looseA.Equals(NormalizeFileNameLoose(nameB, versionB), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="newName"/> is a later version of <paramref name="oldName"/>. A renamed file (one that only
+    /// matches loosely) also needs a strictly higher version number.
+    /// </summary>
+    public static bool IsNewerFileInSameLineage(string? oldName, string? oldVersion, string? newName, string? newVersion)
+    {
+        if (NormalizeFileName(oldName, oldVersion).Equals(NormalizeFileName(newName, newVersion), StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IsSameFileLineage(oldName, oldVersion, newName, newVersion) && VersionIsGreater(newVersion, oldVersion);
+    }
+
+    /// <summary>
+    /// Compares the numeric parts of two version strings: "1.2.10" is greater than "1.2.9", and "2" is not greater than
+    /// "2.0". A version without any number is never greater.
+    /// </summary>
+    public static bool VersionIsGreater(string? candidate, string? baseline)
+    {
+        static List<long> Parts(string? v) => Regex.Matches(v ?? "", @"\d+").Select(m => long.TryParse(m.Value, out var n) ? n : 0).ToList();
+
+        var a = Parts(candidate);
+        var b = Parts(baseline);
+        if (a.Count == 0) return false;
+
+        for (var i = 0; i < Math.Max(a.Count, b.Count); i++)
+        {
+            var x = i < a.Count ? a[i] : 0;
+            var y = i < b.Count ? b[i] : 0;
+            if (x != y) return x > y;
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Given an existing version string, return all possible variations that
     /// a user may place inside the file name on a mod page.
