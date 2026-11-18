@@ -45,6 +45,7 @@ The [release notes](../../releases) list every change.
 | Fallout 4 | F4SE launch |
 | Baldur's Gate 3 | |
 | Mount & Blade II: Bannerlord | |
+| The Witcher 3: Wild Hunt | Mods, DLC and menu mod files; no Script Merger or load order yet |
 
 On Linux, NMA finds games installed with:
 

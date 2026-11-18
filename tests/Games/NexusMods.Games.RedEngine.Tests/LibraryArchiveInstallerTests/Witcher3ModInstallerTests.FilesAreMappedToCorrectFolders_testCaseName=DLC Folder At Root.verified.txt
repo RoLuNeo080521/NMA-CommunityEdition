@@ -1,0 +1,6 @@
+﻿[
+  {
+    FromPath: dlcFoo/content/blob0.bundle,
+    ToGamePath: {Game}/DLC/dlcFoo/content/blob0.bundle
+  }
+]

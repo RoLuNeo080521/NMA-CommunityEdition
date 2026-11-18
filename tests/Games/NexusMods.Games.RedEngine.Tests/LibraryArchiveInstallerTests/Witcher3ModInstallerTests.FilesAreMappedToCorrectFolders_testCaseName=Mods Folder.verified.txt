@@ -1,0 +1,10 @@
+﻿[
+  {
+    FromPath: Mods/modFoo/content/blob0.bundle,
+    ToGamePath: {Game}/Mods/modFoo/content/blob0.bundle
+  },
+  {
+    FromPath: Mods/modFoo/content/scripts/game/player.ws,
+    ToGamePath: {Game}/Mods/modFoo/content/scripts/game/player.ws
+  }
+]

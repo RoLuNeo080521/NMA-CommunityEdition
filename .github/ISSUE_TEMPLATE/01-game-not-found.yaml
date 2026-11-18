@@ -46,6 +46,7 @@ body:
         - Fallout 4
         - Baldur's Gate 3
         - "Mount & Blade II: Bannerlord"
+        - "The Witcher 3: Wild Hunt"
     validations:
       required: true
   - type: dropdown

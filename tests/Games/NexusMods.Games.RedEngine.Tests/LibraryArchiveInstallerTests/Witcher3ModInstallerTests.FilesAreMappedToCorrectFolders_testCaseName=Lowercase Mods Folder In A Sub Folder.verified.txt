@@ -1,0 +1,6 @@
+﻿[
+  {
+    FromPath: My Mod/mods/modFoo/content/blob0.bundle,
+    ToGamePath: {Game}/Mods/modFoo/content/blob0.bundle
+  }
+]
