@@ -14,6 +14,18 @@ on:
       - "**.targets"
       - "**.sln"
       - "global.json"
+  # The pushes above don't cover pull requests from forks. Their runs get a read-only token and no secrets, and GitHub
+  # can ask a maintainer to approve them (Settings > Actions > General).
+  pull_request:
+    paths:
+      - ".github/workflows/tests.yml"
+      - "src/**"
+      - "tests/**"
+      - "extern/**"
+      - "**.props"
+      - "**.targets"
+      - "**.sln"
+      - "global.json"
   workflow_dispatch:
 
 concurrency:
@@ -34,6 +46,8 @@ env:
 
 jobs:
   test:
+    # The push of a branch of this repository already tests its pull request
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 60
 

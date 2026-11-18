@@ -17,7 +17,12 @@
   {
     "name": "needs-response",
     "color": "d4c5f9",
-    "description": "Waiting for the reporter: closed after 3 weeks without an answer"
+    "description": "Waiting for the reporter or the PR author: issues are closed after 3 weeks without an answer"
+  },
+  {
+    "name": "Stale",
+    "color": "ededed",
+    "description": "Waiting for an answer from its author for a week"
   },
   {
     "name": "area-dependencies",

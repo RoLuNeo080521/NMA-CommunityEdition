@@ -23,6 +23,28 @@ Instructions pour Claude Code (et tout contributeur) travaillant sur ce dépôt.
 - Les projets ciblent `net10.0` (`Directory.Build.props`). `global.json` demande un SDK ≥ 10.0.100
   (`rollForward: latestMajor`) et fait tourner `dotnet test` sur Microsoft.Testing.Platform (voir « Tests »).
 
+## Vortex comme référence
+
+[Nexus-Mods/Vortex](https://github.com/Nexus-Mods/Vortex), l'autre gestionnaire de mods de
+Nexus Mods (Electron/TypeScript), sert de référence sur les jeux. Il est sous GPL-3.0, comme
+NMA : on peut adapter sa logique en C#, en citant le fichier d'origine dans le commit ou un
+commentaire. On y reprend ce qu'il sait des jeux, pas son code tel quel.
+
+```bash
+# En lecture seule, hors de ce dépôt. GIT_LFS_SKIP_SMUDGE : le proxy de
+# l'environnement cloud ne sert pas Git LFS.
+GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 \
+  https://github.com/Nexus-Mods/vortex ../nexus-mods/vortex
+```
+
+- `extensions/games/game-<jeu>/` : identifiants de magasin, installateurs,
+  ordre de chargement et outils de 86 jeux, dont The Witcher 3, Baldur's Gate 3,
+  Fallout 4 et Skyrim. L'extension Cyberpunk 2077 y est minimale.
+- `src/renderer/src/extensions/nexus_integration/util/graphQueries.ts` :
+  les requêtes GraphQL de Nexus Mods, dont `modRequirements`.
+- `src/renderer/src/util/linux/` : la détection de Proton et des dossiers
+  de Steam sous Linux.
+
 ## Build
 
 Le build échoue sans :
@@ -107,9 +129,12 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 
 ## CI (GitHub Actions)
 
-- `build-appimage.yml` : à chaque push (toutes branches), à la demande, et appelé par `release.yaml`.
-  Publie l'artifact `nma-appimage`.
-- `tests.yml` : à chaque push qui touche au code, avec la commande ci-dessus (plus `--timeout 20m`).
+- `build-appimage.yml` : à chaque push (toutes branches), pour les PR venant d'un fork, à la demande, et appelé
+  par `release.yaml`. Publie l'artifact `nma-appimage`.
+- `tests.yml` : à chaque push qui touche au code et pour les PR venant d'un fork, avec la commande ci-dessus (plus
+  `--timeout 20m`).
+- Les deux sautent les PR d'une branche du dépôt, déjà couvertes par le push de la branche. Sur une PR venant d'un
+  fork, ils testent la PR fusionnée dans `main`, avec un jeton en lecture seule et sans secrets.
 - `tests.yml` utilise le SDK .NET 10 de l'image `ubuntu-latest`. `build-appimage.yml` installe d'abord le
   dernier SDK 10 avec `actions/setup-dotnet` : l'AppImage embarque le runtime que connaît ce SDK, et celui de
   l'image a souvent quelques correctifs de retard. Si le CDN de Microsoft échoue (erreurs 409 déjà vues), il
@@ -117,6 +142,8 @@ APPIMAGE_EXTRACT_AND_RUN=1 pupnet -y -k AppImage -p DefineConstants=INSTALLATION
 - `labels.yml` : crée ou met à jour les labels de `.github/labels.json` quand ce fichier change sur `main`, ou
   à la demande. Un label utilisé par un modèle d'issue, dependabot ou un workflow doit y figurer : sinon les
   modèles d'issues et dependabot l'ignorent.
+- `stale.yaml` : chaque jour, marque « Stale » les issues et les PR étiquetées `needs-response` sans activité
+  depuis 7 jours, et ferme ces issues 14 jours plus tard. Il ne ferme jamais de PR.
 - `vulnerable-packages.yml` : chaque lundi et à la demande, échoue si un paquet NuGet, direct ou indirect, a une
   vulnérabilité connue (`dotnet list package --vulnerable --include-transitive`). Dependabot ne voit pas les
   dépendances indirectes.
